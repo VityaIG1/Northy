@@ -39,7 +39,7 @@ public struct ServersView: View {
     private var headerStatusStrip: some View {
         HStack(alignment: .center) {
             NothingDotMatrixLabel(
-                text: "NOTHING VPN",
+                text: "NORTHY",
                 dotSize: 2.8,
                 spacing: 1.2,
                 activeColor: NothingPalette.pureWhite

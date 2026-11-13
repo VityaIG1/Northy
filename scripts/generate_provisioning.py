@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-North VPN — Mobileprovision generator for Ad-Hoc / Self-Signed deployment
+Northy — Mobileprovision generator for Ad-Hoc / Self-Signed deployment
 Generates a valid DER-encoded CMS signed .mobileprovision profile.
 """
 
@@ -15,13 +15,13 @@ def generate_profile(app_id: str, team_id: str, app_group: str, cert_pem: str, k
     expiration = now + timedelta(days=3650) # 10 years validity
 
     profile_dict = {
-        'AppIDName': f'North VPN ({app_id})',
+        'AppIDName': f'Northy ({app_id})',
         'ApplicationIdentifierPrefix': [team_id],
         'CreationDate': now,
         'ExpirationDate': expiration,
-        'Name': f'North VPN AdHoc Profile ({app_id})',
+        'Name': f'Northy AdHoc Profile ({app_id})',
         'TeamIdentifier': [team_id],
-        'TeamName': 'North Security Team',
+        'TeamName': 'Northy Team',
         'TimeToLive': 3650,
         'ProvisionsAllDevices': True,
         'Entitlements': {

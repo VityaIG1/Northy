@@ -1,4 +1,4 @@
-name: NothingVPN
+name: Northy
 options:
   bundleIdPrefix: com.scrt
   deploymentTarget:
@@ -14,25 +14,26 @@ settings:
     DEVELOPMENT_TEAM: NORTHVPN99
 
 targets:
-  NothingVPN:
+  Northy:
     type: application
     platform: iOS
     sources:
-      - path: NothingVPN
+      - path: Northy
         excludes:
           - "*.entitlements"
       - path: Shared
     dependencies:
-      - target: NothingVPNTunnel
+      - target: NorthyTunnel
         embed: true
     entitlements:
-      path: NothingVPN/NothingVPN.entitlements
+      path: Northy/Northy.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.scrt.north
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Northy
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -40,19 +41,19 @@ targets:
         STRING_CATALOG_GENERATE_SYMBOLS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
 
-  NothingVPNTunnel:
+  NorthyTunnel:
     type: app-extension
     platform: iOS
     sources:
-      - path: NothingVPNTunnel
+      - path: NorthyTunnel
         excludes:
           - "Info.plist"
           - "*.entitlements"
       - path: Shared
     info:
-      path: NothingVPNTunnel/Info.plist
+      path: NorthyTunnel/Info.plist
     entitlements:
-      path: NothingVPNTunnel/NothingVPNTunnel.entitlements
+      path: NorthyTunnel/NorthyTunnel.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.scrt.north.PacketTunnel

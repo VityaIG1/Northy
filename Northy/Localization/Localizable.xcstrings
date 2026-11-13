@@ -18,8 +18,8 @@
     "app.title" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "NOTHING // VPN" } },
-        "ru" : { "stringUnit" : { "state" : "translated", "value" : "NOTHING // VPN" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "NORTHY" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "NORTHY" } }
       }
     },
     "connection.allowinsecure" : {

@@ -1,6 +1,6 @@
 //
 // Base.xcconfig
-// NothingVPN
+// Northy
 //
 // Target OS: iOS 26.0+
 // Swift Language Version: 6.0
@@ -25,4 +25,4 @@ MAIN_BUNDLE_IDENTIFIER = com.scrt.north
 TUNNEL_BUNDLE_IDENTIFIER = com.scrt.north.PacketTunnel
 APP_GROUP_IDENTIFIER = group.com.scrt.north
 
-INFOPLIST_KEY_CFBundleDisplayName = North VPN
+INFOPLIST_KEY_CFBundleDisplayName = Northy

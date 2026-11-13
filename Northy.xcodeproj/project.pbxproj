@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000502600000100000001 /* NothingVPNTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A10000612600000100000001 /* NothingVPNTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A10000502600000100000001 /* NorthyTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A10000612600000100000001 /* NorthyTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -16,7 +16,7 @@
 			containerPortal = A10000012600000100000001 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A10000032600000100000001;
-			remoteInfo = NothingVPNTunnel;
+			remoteInfo = NorthyTunnel;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -27,7 +27,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				A10000502600000100000001 /* NothingVPNTunnel.appex in Embed Foundation Extensions */,
+				A10000502600000100000001 /* NorthyTunnel.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -35,32 +35,32 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		A10000602600000100000001 /* NothingVPN.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NothingVPN.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000612600000100000001 /* NothingVPNTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NothingVPNTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000602600000100000001 /* Northy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Northy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000612600000100000001 /* NorthyTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NorthyTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A10000802600000100000001 /* Exceptions for "NothingVPNTunnel" folder in "NothingVPNTunnel" target */ = {
+		A10000802600000100000001 /* Exceptions for "NorthyTunnel" folder in "NorthyTunnel" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = A10000032600000100000001 /* NothingVPNTunnel */;
+			target = A10000032600000100000001 /* NorthyTunnel */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A10000202600000100000001 /* NothingVPN */ = {
+		A10000202600000100000001 /* Northy */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = NothingVPN;
+			path = Northy;
 			sourceTree = "<group>";
 		};
-		A10000212600000100000001 /* NothingVPNTunnel */ = {
+		A10000212600000100000001 /* NorthyTunnel */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				A10000802600000100000001 /* Exceptions for "NothingVPNTunnel" folder in "NothingVPNTunnel" target */,
+				A10000802600000100000001 /* Exceptions for "NorthyTunnel" folder in "NorthyTunnel" target */,
 			);
-			path = NothingVPNTunnel;
+			path = NorthyTunnel;
 			sourceTree = "<group>";
 		};
 		A10000222600000100000001 /* Shared */ = {
@@ -91,8 +91,8 @@
 		A10000002600000100000001 = {
 			isa = PBXGroup;
 			children = (
-				A10000202600000100000001 /* NothingVPN */,
-				A10000212600000100000001 /* NothingVPNTunnel */,
+				A10000202600000100000001 /* Northy */,
+				A10000212600000100000001 /* NorthyTunnel */,
 				A10000222600000100000001 /* Shared */,
 				A10000622600000100000001 /* Products */,
 			);
@@ -101,8 +101,8 @@
 		A10000622600000100000001 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000602600000100000001 /* NothingVPN.app */,
-				A10000612600000100000001 /* NothingVPNTunnel.appex */,
+				A10000602600000100000001 /* Northy.app */,
+				A10000612600000100000001 /* NorthyTunnel.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -110,9 +110,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10000022600000100000001 /* NothingVPN */ = {
+		A10000022600000100000001 /* Northy */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000302600000100000001 /* Build configuration list for PBXNativeTarget "NothingVPN" */;
+			buildConfigurationList = A10000302600000100000001 /* Build configuration list for PBXNativeTarget "Northy" */;
 			buildPhases = (
 				A10000702600000100000001 /* Sources */,
 				A10000712600000100000001 /* Frameworks */,
@@ -125,19 +125,19 @@
 				A10000112600000100000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				A10000202600000100000001 /* NothingVPN */,
+				A10000202600000100000001 /* Northy */,
 				A10000222600000100000001 /* Shared */,
 			);
-			name = NothingVPN;
+			name = Northy;
 			packageProductDependencies = (
 			);
-			productName = NothingVPN;
-			productReference = A10000602600000100000001 /* NothingVPN.app */;
+			productName = Northy;
+			productReference = A10000602600000100000001 /* Northy.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A10000032600000100000001 /* NothingVPNTunnel */ = {
+		A10000032600000100000001 /* NorthyTunnel */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000312600000100000001 /* Build configuration list for PBXNativeTarget "NothingVPNTunnel" */;
+			buildConfigurationList = A10000312600000100000001 /* Build configuration list for PBXNativeTarget "NorthyTunnel" */;
 			buildPhases = (
 				A10000742600000100000001 /* Sources */,
 				A10000752600000100000001 /* Frameworks */,
@@ -148,14 +148,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A10000212600000100000001 /* NothingVPNTunnel */,
+				A10000212600000100000001 /* NorthyTunnel */,
 				A10000222600000100000001 /* Shared */,
 			);
-			name = NothingVPNTunnel;
+			name = NorthyTunnel;
 			packageProductDependencies = (
 			);
-			productName = NothingVPNTunnel;
-			productReference = A10000612600000100000001 /* NothingVPNTunnel.appex */;
+			productName = NorthyTunnel;
+			productReference = A10000612600000100000001 /* NorthyTunnel.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -168,7 +168,7 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 			};
-			buildConfigurationList = A10000292600000100000001 /* Build configuration list for PBXProject "NothingVPN" */;
+			buildConfigurationList = A10000292600000100000001 /* Build configuration list for PBXProject "Northy" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -183,8 +183,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A10000022600000100000001 /* NothingVPN */,
-				A10000032600000100000001 /* NothingVPNTunnel */,
+				A10000022600000100000001 /* Northy */,
+				A10000032600000100000001 /* NorthyTunnel */,
 			);
 		};
 /* End PBXProject section */
@@ -226,7 +226,7 @@
 /* Begin PBXTargetDependency section */
 		A10000112600000100000001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A10000032600000100000001 /* NothingVPNTunnel */;
+			target = A10000032600000100000001 /* NorthyTunnel */;
 			targetProxy = A10000102600000100000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -264,7 +264,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = NothingVPN/NothingVPN.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Northy/Northy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -292,7 +292,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = NothingVPN/NothingVPN.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Northy/Northy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -318,10 +318,10 @@
 		A10000442600000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = NothingVPNTunnel/NothingVPNTunnel.entitlements;
+				CODE_SIGN_ENTITLEMENTS = NorthyTunnel/NorthyTunnel.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = NothingVPNTunnel/Info.plist;
+				INFOPLIST_FILE = NorthyTunnel/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -340,10 +340,10 @@
 		A10000452600000100000001 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = NothingVPNTunnel/NothingVPNTunnel.entitlements;
+				CODE_SIGN_ENTITLEMENTS = NorthyTunnel/NorthyTunnel.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = NothingVPNTunnel/Info.plist;
+				INFOPLIST_FILE = NorthyTunnel/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -362,7 +362,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000292600000100000001 /* Build configuration list for PBXProject "NothingVPN" */ = {
+		A10000292600000100000001 /* Build configuration list for PBXProject "Northy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000402600000100000001 /* Debug */,
@@ -371,7 +371,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A10000302600000100000001 /* Build configuration list for PBXNativeTarget "NothingVPN" */ = {
+		A10000302600000100000001 /* Build configuration list for PBXNativeTarget "Northy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000422600000100000001 /* Debug */,
@@ -380,7 +380,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A10000312600000100000001 /* Build configuration list for PBXNativeTarget "NothingVPNTunnel" */ = {
+		A10000312600000100000001 /* Build configuration list for PBXNativeTarget "NorthyTunnel" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10000442600000100000001 /* Debug */,

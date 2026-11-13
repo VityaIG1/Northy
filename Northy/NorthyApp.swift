@@ -1,9 +1,9 @@
 import SwiftUI
 
-// MARK: - NothingVPN Main Application Entry Point (iOS 26.0+)
+// MARK: - Northy Main Application Entry Point (iOS 26.0+)
 
 @main
-public struct NothingVPNApp: App {
+public struct NorthyApp: App {
     @State private var localization = LocalizationManager()
     @State private var vpnManager = VPNTunnelManager()
     @State private var activeTab: NothingNavigationTab = .servers

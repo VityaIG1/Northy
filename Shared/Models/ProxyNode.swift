@@ -337,7 +337,7 @@ public struct HappConnectionSettings: Codable, Hashable, Sendable {
 // MARK: - Happ Subscription Settings (Настройки подписок)
 
 public enum SubscriptionUserAgentProfile: String, Codable, CaseIterable, Sendable {
-    case happ = "Happ/0.1.0 (iOS 26.0; NothingVPN)"
+    case happ = "Happ/0.1.0 (iOS 26.0; Northy)"
     case v2rayNG = "v2rayNG/1.8.23"
     case clashMeta = "ClashMetaForAndroid/2.10.1"
     case singBox = "SFI/1.10.0 (iOS; sing-box 1.10.0)"

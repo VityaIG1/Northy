@@ -1,8 +1,9 @@
-# North VPN (NothingVPN iOS Client)
+# Northy (iOS 26+ Native Client)
 
 Нативный VPN-клиент для iOS в индустриальной эстетике **Nothing OS** с архитектурой **Happ** (`NEPacketTunnelProvider`, Xray/Sing-box Core, VLESS REALITY, VMess, Trojan, Shadowsocks).
 
 **Идентификаторы:**
+- **Имя приложения:** `Northy`
 - **Bundle ID:** `com.scrt.north`
 - **Extension ID:** `com.scrt.north.PacketTunnel`
 - **App Group:** `group.com.scrt.north`
@@ -31,7 +32,7 @@
    ```bash
    git init
    git add .
-   git commit -m "feat: North VPN client with auto-signed IPA workflow"
+   git commit -m "feat: Northy iOS client with auto-signed IPA workflow"
    ```
 
 2. **Привяжите ваш репозиторий на GitHub и отправьте код:**
@@ -43,8 +44,8 @@
 
 3. **Сборка и скачивание подписанного IPA:**
    - Перейдите во вкладку **Actions** в репозитории на GitHub.
-   - Выберите воркфлоу **Build NothingVPN IPA** (запускается автоматически при пуше или кнопкой **Run workflow**).
-   - По завершении сборки скачайте готовый подписанный архив в секции **Artifacts** (`NothingVPN-v0.1.0-signed-ipa`).
+   - Выберите воркфлоу **Build Northy IPA** (запускается автоматически при пуше или кнопкой **Run workflow**).
+   - По завершении сборки скачайте готовый подписанный архив в секции **Artifacts** (`Northy-v0.1.0-signed-ipa`).
 
 ### Установка на устройство:
 - **TrollStore:** Устанавливает напрямую без переподписи, сохраняя все entitlements туннеля.
@@ -61,4 +62,4 @@ chmod +x scripts/build_ipa.sh
 ./scripts/build_ipa.sh
 ```
 
-Готовый файл появится в `build/NothingVPN-v0.1.0-signed.ipa`.
+Готовый файл появится в `build/Northy-v0.1.0-signed.ipa` и `build/Northy.ipa`.

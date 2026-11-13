@@ -2,24 +2,25 @@
 set -euo pipefail
 
 # ==============================================================================
-# North VPN (NothingVPN) — Automated Signed .ipa Builder for iOS
+# Northy — Automated Signed .ipa Builder for iOS
 # Bundle ID: com.scrt.north | Extension: com.scrt.north.PacketTunnel
 # Team ID: NORTHVPN99 | App Group: group.com.scrt.north
 # Usage: ./scripts/build_ipa.sh
 # ==============================================================================
 
-SCHEME="NothingVPN"
+SCHEME="Northy"
+PROJECT="Northy.xcodeproj"
 APP_BUNDLE_ID="com.scrt.north"
 TUNNEL_BUNDLE_ID="com.scrt.north.PacketTunnel"
 TEAM_ID="NORTHVPN99"
 APP_GROUP="group.com.scrt.north"
 
 BUILD_DIR="./build"
-ARCHIVE_PATH="${BUILD_DIR}/NothingVPN.xcarchive"
+ARCHIVE_PATH="${BUILD_DIR}/Northy.xcarchive"
 PAYLOAD_DIR="${BUILD_DIR}/Payload"
-APP_DIR="${PAYLOAD_DIR}/NothingVPN.app"
-TUNNEL_DIR="${APP_DIR}/PlugIns/NothingVPNTunnel.appex"
-OUTPUT_NAME="NothingVPN-v0.1.0-signed.ipa"
+APP_DIR="${PAYLOAD_DIR}/Northy.app"
+TUNNEL_DIR="${APP_DIR}/PlugIns/NorthyTunnel.appex"
+OUTPUT_NAME="Northy-v0.1.0-signed.ipa"
 OUTPUT_IPA="${BUILD_DIR}/${OUTPUT_NAME}"
 
 rm -rf "${BUILD_DIR}"
@@ -41,10 +42,10 @@ if [ -n "${SDK_VERSION}" ]; then
 fi
 
 echo "=========================================================="
-echo ">> [2/5] Building Release archive..."
+echo ">> [2/5] Building Release archive (${SCHEME})..."
 echo "=========================================================="
 xcodebuild \
-  -project NothingVPN.xcodeproj \
+  -project "${PROJECT}" \
   -scheme "${SCHEME}" \
   -configuration Release \
   -sdk iphoneos \
@@ -59,19 +60,19 @@ xcodebuild \
 echo "=========================================================="
 echo ">> [3/5] Extracting compiled app bundle into Payload..."
 echo "=========================================================="
-cp -R "${ARCHIVE_PATH}/Products/Applications/NothingVPN.app" "${APP_DIR}"
+cp -R "${ARCHIVE_PATH}/Products/Applications/Northy.app" "${APP_DIR}"
 
 echo "=========================================================="
 echo ">> [4/5] Preparing code signing identity & mobileprovisions..."
 echo "=========================================================="
-TEMP_DIR="/tmp/north_signing_$$"
+TEMP_DIR="/tmp/northy_signing_$$"
 mkdir -p "${TEMP_DIR}"
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
 CERT_PEM="${TEMP_DIR}/cert.pem"
 KEY_PEM="${TEMP_DIR}/key.pem"
 openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 \
-  -subj "/CN=Apple Development: North VPN/OU=${TEAM_ID}/O=North/C=US" \
+  -subj "/CN=Apple Development: Northy/OU=${TEAM_ID}/O=Northy/C=US" \
   -keyout "${KEY_PEM}" -out "${CERT_PEM}" 2>/dev/null
 
 # Generate or copy embedded.mobileprovision for App and Tunnel Extension
@@ -106,7 +107,7 @@ SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 if [ -z "${SIGN_IDENTITY}" ]; then
   if command -v security >/dev/null 2>&1; then
     KEYCHAIN_PASS="temp_pass_${RANDOM}"
-    AUTO_KEYCHAIN="${TEMP_DIR}/north.keychain-db"
+    AUTO_KEYCHAIN="${TEMP_DIR}/northy.keychain-db"
     
     security create-keychain -p "${KEYCHAIN_PASS}" "${AUTO_KEYCHAIN}" 2>/dev/null || true
     security unlock-keychain -p "${KEYCHAIN_PASS}" "${AUTO_KEYCHAIN}" 2>/dev/null || true
@@ -119,7 +120,7 @@ if [ -z "${SIGN_IDENTITY}" ]; then
     security list-keychains -d user -s "${AUTO_KEYCHAIN}" $(security list-keychains -d user | tr -d '"') 2>/dev/null || true
     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASS}" "${AUTO_KEYCHAIN}" 2>/dev/null || true
 
-    SIGN_IDENTITY="Apple Development: North VPN"
+    SIGN_IDENTITY="Apple Development: Northy"
   else
     SIGN_IDENTITY="-"
   fi
@@ -148,20 +149,20 @@ fi
 if [ -d "${TUNNEL_DIR}" ]; then
   echo ">> Signing PacketTunnel extension with entitlements..."
   codesign --force --sign "${SIGN_IDENTITY}" \
-    --entitlements NothingVPNTunnel/NothingVPNTunnel.entitlements \
+    --entitlements NorthyTunnel/NorthyTunnel.entitlements \
     --timestamp=none "${TUNNEL_DIR}" || \
   codesign --force --sign "-" \
-    --entitlements NothingVPNTunnel/NothingVPNTunnel.entitlements \
+    --entitlements NorthyTunnel/NorthyTunnel.entitlements \
     --timestamp=none "${TUNNEL_DIR}"
 fi
 
 # 2. Sign Main Application SECOND
 echo ">> Signing Main Application with entitlements..."
 codesign --force --sign "${SIGN_IDENTITY}" \
-  --entitlements NothingVPN/NothingVPN.entitlements \
+  --entitlements Northy/Northy.entitlements \
   --timestamp=none "${APP_DIR}" || \
 codesign --force --sign "-" \
-  --entitlements NothingVPN/NothingVPN.entitlements \
+  --entitlements Northy/Northy.entitlements \
   --timestamp=none "${APP_DIR}"
 
 echo ">> Verifying code signature..."
@@ -175,7 +176,7 @@ echo "=========================================================="
 echo ">> [5/5] Packaging .ipa..."
 echo "=========================================================="
 (cd "${BUILD_DIR}" && zip -qry "${OUTPUT_NAME}" Payload)
-cp "${OUTPUT_IPA}" "${BUILD_DIR}/NothingVPN.ipa"
+cp "${OUTPUT_IPA}" "${BUILD_DIR}/Northy.ipa"
 
 IPA_SIZE=$(du -h "${OUTPUT_IPA}" | cut -f1)
 
