@@ -688,7 +688,7 @@ public struct HappLinkParser: Sendable {
             "routeOnly": !connection.sniffOverrideDestination
         ]
 
-        // Inbounds (TUN + Local SOCKS5/HTTP Proxy)
+        // Inbounds (TUN + Local SOCKS5 + HTTP Proxy + DNS Inbound)
         var inbounds: [[String: Any]] = [
             [
                 "tag": "socks-in",
@@ -704,6 +704,18 @@ public struct HappLinkParser: Sendable {
                 "listen": "127.0.0.1",
                 "port": 10809,
                 "sniffing": sniffingConfig
+            ],
+            [
+                "tag": "dns-in",
+                "protocol": "dokodemo-door",
+                "listen": "127.0.0.1",
+                "port": 10853,
+                "settings": [
+                    "address": "127.0.0.1",
+                    "port": 53,
+                    "network": "tcp,udp",
+                    "followRedirect": false
+                ]
             ]
         ]
 
@@ -714,13 +726,14 @@ public struct HappLinkParser: Sendable {
                 "settings": [
                     "name": "utun99",
                     "MTU": connection.tunMTU,
-                    "autoRoute": true
+                    "autoRoute": true,
+                    "strictRoute": false
                 ],
                 "sniffing": sniffingConfig
             ], at: 0)
         }
 
-        // Outbounds (Proxy + Mux + Fragment + Direct + Block)
+        // Outbounds (Proxy + Mux + Fragment + Direct + Block + DNS Outbound)
         var proxyOutbound: [String: Any] = [
             "tag": "proxy",
             "protocol": outboundProtocol,
@@ -767,14 +780,39 @@ public struct HappLinkParser: Sendable {
             "tag": "block",
             "protocol": "blackhole"
         ])
+        outbounds.append([
+            "tag": "dns-out",
+            "protocol": "dns",
+            "settings": [
+                "network": "tcp,udp",
+                "address": routing.dnsProvider.resolverAddresses.first ?? "1.1.1.1",
+                "port": 53
+            ]
+        ])
 
+        // Routing Rules
         var routingRules: [[String: Any]] = [
+            // Route DNS requests to DNS outbound
             [
+                "type": "field",
+                "inboundTag": ["dns-in"],
+                "outboundTag": "dns-out"
+            ],
+            [
+                "type": "field",
+                "port": "53",
+                "network": "udp",
+                "outboundTag": "dns-out"
+            ]
+        ]
+
+        if routing.bypassLocalNetwork || routing.routingMode == .splitBypassLANAndRegional {
+            routingRules.append([
                 "type": "field",
                 "ip": ["geoip:private"],
                 "outboundTag": "direct"
-            ]
-        ]
+            ])
+        }
 
         if routing.routingMode == .splitBypassLANAndRegional {
             routingRules.append([
@@ -787,6 +825,13 @@ public struct HappLinkParser: Sendable {
                 "ip": ["geoip:ru"],
                 "outboundTag": "direct"
             ])
+            for cidr in routing.customExcludedCIDRs where !cidr.isEmpty {
+                routingRules.append([
+                    "type": "field",
+                    "ip": [cidr],
+                    "outboundTag": "direct"
+                ])
+            }
         } else if routing.routingMode == .directOnly {
             routingRules.append([
                 "type": "field",
@@ -795,8 +840,26 @@ public struct HappLinkParser: Sendable {
             ])
         }
 
+        // Observability & Core Traffic Statistics Policy
+        let statsPolicy: [String: Any] = [
+            "system": [
+                "statsInboundUplink": true,
+                "statsInboundDownlink": true,
+                "statsOutboundUplink": true,
+                "statsOutboundDownlink": true
+            ],
+            "levels": [
+                "0": [
+                    "statsUserUplink": true,
+                    "statsUserDownlink": true
+                ]
+            ]
+        ]
+
         let rootConfig: [String: Any] = [
             "log": ["loglevel": connection.logLevel.rawValue],
+            "stats": [:] as [String: Any],
+            "policy": statsPolicy,
             "dns": [
                 "servers": routing.dnsProvider.resolverAddresses
             ],

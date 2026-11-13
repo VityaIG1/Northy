@@ -12,6 +12,9 @@ import Darwin
 public enum TunnelIPCCommand: String, Codable, Sendable {
     case queryTelemetry = "QUERY_TELEMETRY"
     case reloadRouting = "RELOAD_ROUTING"
+    case measureLatency = "MEASURE_LATENCY"
+    case queryCoreStatus = "QUERY_CORE_STATUS"
+    case stopTunnel = "STOP_TUNNEL"
 }
 
 public final class SharedTunnelStore: Sendable {
@@ -34,6 +37,27 @@ public final class SharedTunnelStore: Sendable {
             return mainId.hasSuffix(".PacketTunnel") ? mainId : "\(mainId).PacketTunnel"
         }
         return "com.scrt.north.PacketTunnel"
+    }
+
+    /// Shared container directory in App Group sandbox for core configurations and geo data assets.
+    public static var sharedContainerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
+    }
+
+    public static var activeConfigFileURL: URL? {
+        sharedContainerURL?.appendingPathComponent("config.json")
+    }
+
+    public static var telemetryFileURL: URL? {
+        sharedContainerURL?.appendingPathComponent("telemetry.json")
+    }
+
+    public static var assetsDirectoryURL: URL? {
+        let dir = sharedContainerURL?.appendingPathComponent("assets", isDirectory: true)
+        if let dir, !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        return dir
     }
 
     private enum Keys {
@@ -168,10 +192,17 @@ public final class SharedTunnelStore: Sendable {
 
     public func writeActiveCoreConfiguration(_ data: Data) {
         defaults.set(data, forKey: Keys.activeXrayConfigJSON)
+        if let fileURL = Self.activeConfigFileURL {
+            try? data.write(to: fileURL, options: .atomic)
+        }
     }
 
     public func readActiveCoreConfiguration() -> Data? {
-        defaults.data(forKey: Keys.activeXrayConfigJSON)
+        if let fileURL = Self.activeConfigFileURL,
+           let data = try? Data(contentsOf: fileURL), !data.isEmpty {
+            return data
+        }
+        return defaults.data(forKey: Keys.activeXrayConfigJSON)
     }
 
     // MARK: - Language Preference
@@ -189,19 +220,30 @@ public final class SharedTunnelStore: Sendable {
     public func writeActiveTelemetry(_ telemetry: TunnelRuntimeTelemetry) {
         if let data = try? JSONEncoder().encode(telemetry) {
             defaults.set(data, forKey: Keys.activeTelemetry)
+            if let fileURL = Self.telemetryFileURL {
+                try? data.write(to: fileURL, options: .atomic)
+            }
         }
     }
 
     public func readActiveTelemetry() -> TunnelRuntimeTelemetry? {
-        guard let data = defaults.data(forKey: Keys.activeTelemetry),
-              let telemetry = try? JSONDecoder().decode(TunnelRuntimeTelemetry.self, from: data) else {
-            return nil
+        if let data = defaults.data(forKey: Keys.activeTelemetry),
+           let telemetry = try? JSONDecoder().decode(TunnelRuntimeTelemetry.self, from: data) {
+            return telemetry
         }
-        return telemetry
+        if let fileURL = Self.telemetryFileURL,
+           let data = try? Data(contentsOf: fileURL),
+           let telemetry = try? JSONDecoder().decode(TunnelRuntimeTelemetry.self, from: data) {
+            return telemetry
+        }
+        return nil
     }
 
     public func clearActiveTelemetry() {
         defaults.removeObject(forKey: Keys.activeTelemetry)
+        if let fileURL = Self.telemetryFileURL {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
     }
 
     // MARK: - Persistent Unique Device Hardware UUID (X-HWID)

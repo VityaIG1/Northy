@@ -2,27 +2,27 @@ import Foundation
 @preconcurrency import NetworkExtension
 import os.log
 
-#if canImport(LibXray)
-import LibXray
-#endif
-
-// MARK: - Happ-Architecture PacketTunnelProvider
+// MARK: - Production-Grade PacketTunnelProvider (Xray-core / Sing-box & TUN Engine)
 
 public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
     private let logger = Logger(subsystem: "com.scrt.north.PacketTunnel", category: "TunnelCore")
     private let telemetryLock = NSLock()
+
+    private let coreController = ProxyCoreController()
+    private var tunBridge: TUNPacketBridge?
+
     private var connectedAt: Date?
     private var activeNodeId: UUID?
-    private var rxBytesCounter: UInt64 = 0
-    private var txBytesCounter: UInt64 = 0
-    private var packetLoopTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
 
     // MARK: - Tunnel Start Lifecycle
 
     public override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        logger.notice("NORTHY // Starting NEPacketTunnelProvider session...")
+        logger.notice("NORTHY // Initializing production VPN PacketTunnelProvider...")
+
+        // Optimize Go runtime memory limits immediately before any work (<50MB jetsam budget)
+        ProxyCoreController.tuneGoRuntimeMemory()
 
         let store = SharedTunnelStore.shared
         let routingConfig = store.loadRoutingConfiguration()
@@ -44,7 +44,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             self.activeNodeId = activeNode.id
         }
 
-        // Build or retrieve Xray/Sing-box JSON payload
+        // Build or retrieve real Xray/Sing-box JSON configuration
         let coreConfigData: Data
         if let providerProtocol = protocolConfiguration as? NETunnelProviderProtocol,
            let inlineData = providerProtocol.providerConfiguration?["xrayCoreJSON"] as? Data {
@@ -67,6 +67,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             return
         }
 
+        // Configure virtual TUN network settings
         let networkSettings = buildTunnelNetworkSettings(
             for: activeNode,
             routing: routingConfig,
@@ -85,7 +86,15 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                 self.connectedAt = .now
             }
 
-            self.startXrayOrPacketLoop(coreConfig: coreConfigData)
+            // Launch Real Proxy Core (Xray-core / LibXray / sing-box)
+            let coreResult = self.coreController.startCore(configData: coreConfigData)
+            if case .failure(let coreErr) = coreResult {
+                self.logger.warning("NORTHY // Warning starting proxy core: \(coreErr.localizedDescription)")
+            }
+
+            // Launch High-Throughput TUN Packet Flow Bridge
+            self.startPacketFlowBridge(connectionConfig: connectionConfig)
+
             self.logger.notice("NORTHY // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
             completionHandler(nil)
         }
@@ -95,28 +104,26 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
     public override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         logger.notice("NORTHY // Stopping tunnel (reason: \(String(describing: reason)))")
+
         heartbeatTask?.cancel()
         heartbeatTask = nil
-        packetLoopTask?.cancel()
-        packetLoopTask = nil
 
-        #if canImport(LibXray)
-        LibXrayStopXray()
-        #endif
+        tunBridge?.stop()
+        tunBridge = nil
+
+        coreController.stopCore()
 
         SharedTunnelStore.shared.clearActiveTelemetry()
 
         telemetryLock.withLock {
             connectedAt = nil
             activeNodeId = nil
-            rxBytesCounter = 0
-            txBytesCounter = 0
         }
 
         completionHandler()
     }
 
-    // MARK: - App <-> Extension IPC (Telemetry & Live Routing Reload)
+    // MARK: - App <-> Extension IPC (Telemetry, Real-time Metrics, Reload & Latency Test)
 
     public override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
         guard let commandString = String(data: messageData, encoding: .utf8),
@@ -127,16 +134,20 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
         switch command {
         case .queryTelemetry:
+            let metrics = tunBridge?.currentMetrics
+            let coreStatus = coreController.statusDescription
             let snapshot = telemetryLock.withLock {
                 TunnelRuntimeTelemetry(
                     isConnected: connectedAt != nil,
                     activeNodeId: activeNodeId,
-                    rxBytes: rxBytesCounter,
-                    txBytes: txBytesCounter,
-                    connectedSince: connectedAt
+                    rxBytes: metrics?.rxBytes ?? 0,
+                    txBytes: metrics?.txBytes ?? 0,
+                    rxSpeed: metrics?.rxSpeed ?? 0,
+                    txSpeed: metrics?.txSpeed ?? 0,
+                    connectedSince: connectedAt,
+                    coreStatus: coreStatus
                 )
             }
-
             let encoded = try? JSONEncoder().encode(snapshot)
             completionHandler?(encoded)
 
@@ -145,11 +156,9 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             let routing = store.loadRoutingConfiguration()
             let connection = store.loadConnectionSettings()
             let nodes = store.loadNodes()
-
             let currentId = telemetryLock.withLock { activeNodeId }
 
-            if let currentId,
-               let node = nodes.first(where: { $0.id == currentId }) {
+            if let currentId, let node = nodes.first(where: { $0.id == currentId }) {
                 let updatedSettings = buildTunnelNetworkSettings(
                     for: node,
                     routing: routing,
@@ -161,32 +170,51 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             } else {
                 completionHandler?(Data("NO_NODE".utf8))
             }
+
+        case .measureLatency:
+            Task {
+                let latencyMs = await self.coreController.measureOutboundLatency()
+                let responseDict: [String: Any] = [
+                    "latencyMs": latencyMs as Any,
+                    "status": latencyMs != nil ? "OK" : "TIMEOUT"
+                ]
+                let data = try? JSONSerialization.data(withJSONObject: responseDict)
+                completionHandler?(data)
+            }
+
+        case .queryCoreStatus:
+            let status = coreController.statusDescription
+            completionHandler?(Data(status.utf8))
+
+        case .stopTunnel:
+            cancelTunnelWithError(nil)
+            completionHandler?(Data("STOPPED".utf8))
         }
     }
 
-    // MARK: - Network Settings Construction (Split Tunneling, Proxy-Only Mode, MTU & DoH DNS)
+    // MARK: - Network Settings Construction (Virtual TUN 198.18.0.1/15, DoH / FakeIP & Loop Prevention)
 
     private func buildTunnelNetworkSettings(
         for node: ProxyNode,
         routing: TunnelRoutingConfiguration,
         connection: HappConnectionSettings
     ) -> NEPacketTunnelNetworkSettings {
-        // Resolve host to IPv4 to prevent routing loops
+        // Resolve host to physical IPv4 to prevent routing loop blackholes
         let resolvedIP = Self.isIPv4Address(node.serverHost) ? node.serverHost : SharedTunnelStore.resolveIPv4(host: node.serverHost)
         let remoteAddr = resolvedIP ?? (Self.isIPv4Address(node.serverHost) ? node.serverHost : "198.18.0.1")
 
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: remoteAddr)
         settings.mtu = NSNumber(value: connection.tunMTU)
 
-        // IPv4 TUN interface configuration
+        // Virtual TUN IPv4 configuration: 198.18.0.1/15 (RFC 2544 benchmark/tunnel subnet)
         let ipv4Settings = NEIPv4Settings(
-            addresses: ["198.18.0.2"],
-            subnetMasks: ["255.255.255.252"]
+            addresses: ["198.18.0.1"],
+            subnetMasks: ["255.254.0.0"]
         )
 
         var excludedRoutes: [NEIPv4Route] = []
 
-        // 1. CRITICAL: Always exclude remote proxy server endpoint from tunnel capture to prevent loopback blackhole
+        // 1. CRITICAL: Always exclude remote proxy server physical IP to prevent infinite routing loop
         if let serverIP = resolvedIP, Self.isIPv4Address(serverIP) {
             excludedRoutes.append(NEIPv4Route(destinationAddress: serverIP, subnetMask: "255.255.255.255"))
         }
@@ -205,7 +233,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             }
         }
 
-        // 3. Exclude DNS resolver IPs so initial DNS / DoH bootstrap can complete directly
+        // 3. Exclude DNS resolver IPs so bootstrap resolution proceeds directly
         for dnsServer in routing.dnsProvider.resolverAddresses {
             if Self.isIPv4Address(dnsServer) {
                 excludedRoutes.append(NEIPv4Route(destinationAddress: dnsServer, subnetMask: "255.255.255.255"))
@@ -213,7 +241,6 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         }
 
         if connection.tunnelMode == .proxyOnly {
-            // Proxy-Only Mode: expose local HTTP/SOCKS proxy on 127.0.0.1 without capturing default L3 route
             let proxySettings = NEProxySettings()
             proxySettings.httpEnabled = true
             proxySettings.httpServer = NEProxyServer(address: "127.0.0.1", port: 10809)
@@ -245,24 +272,31 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
         settings.ipv4Settings = ipv4Settings
 
-        // Optional IPv6 routing
+        // Virtual IPv6 routing: fd00::1/126
         if routing.enableIPv6Routing && connection.tunnelMode == .tun {
             let ipv6Settings = NEIPv6Settings(
-                addresses: ["fd00::2"],
+                addresses: ["fd00::1"],
                 networkPrefixLengths: [126]
             )
             ipv6Settings.includedRoutes = [NEIPv6Route.default()]
             settings.ipv6Settings = ipv6Settings
         }
 
-        // DNS configuration: DoH with standard DNS fallback
+        // DNS Configuration: FakeIP / Core Inbound (198.18.0.2) + DoH fallback to eliminate DNS leaks
+        var dnsServers = ["198.18.0.2"]
+        for s in routing.dnsProvider.resolverAddresses {
+            if !dnsServers.contains(s) {
+                dnsServers.append(s)
+            }
+        }
+
         if let dohURL = URL(string: routing.dnsProvider.dohURLString), !routing.dnsProvider.dohURLString.isEmpty {
-            let dohSettings = NEDNSOverHTTPSSettings(servers: routing.dnsProvider.resolverAddresses)
+            let dohSettings = NEDNSOverHTTPSSettings(servers: dnsServers)
             dohSettings.serverURL = dohURL
             dohSettings.matchDomains = [""]
             settings.dnsSettings = dohSettings
         } else {
-            let dnsSettings = NEDNSSettings(servers: routing.dnsProvider.resolverAddresses)
+            let dnsSettings = NEDNSSettings(servers: dnsServers)
             dnsSettings.matchDomains = [""]
             settings.dnsSettings = dnsSettings
         }
@@ -272,65 +306,44 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
     // MARK: - Packet Flow Bridge & Telemetry Heartbeat
 
-    private func startXrayOrPacketLoop(coreConfig: Data) {
+    private func startPacketFlowBridge(connectionConfig: HappConnectionSettings) {
         heartbeatTask?.cancel()
-        packetLoopTask?.cancel()
+        tunBridge?.stop()
 
-        telemetryLock.withLock {
-            txBytesCounter &+= UInt64(coreConfig.count)
-        }
+        // 1. Initialize and start the TUN Packet Bridge (bridges packetFlow to local core SOCKS5 & DNS)
+        let bridge = TUNPacketBridge(
+            packetFlow: packetFlow,
+            socksHost: "127.0.0.1",
+            socksPort: 10808,
+            dnsHost: "127.0.0.1",
+            dnsPort: 10853
+        )
+        bridge.start()
+        self.tunBridge = bridge
 
-        #if canImport(LibXray)
-        if let jsonString = String(data: coreConfig, encoding: .utf8) {
-            LibXrayRunXrayFromJSON(jsonString)
-        }
-        #endif
-
-        // Periodic App Group telemetry heartbeat (guarantees UI 1s poll never drops)
+        // 2. Periodic App Group Telemetry Heartbeat (1s timer)
         heartbeatTask = Task.detached(priority: .medium) { [weak self] in
             while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
                 guard let self else { return }
+
+                let metrics = self.tunBridge?.currentMetrics
+                let coreStatus = self.coreController.statusDescription
+
                 let snapshot = self.telemetryLock.withLock {
                     TunnelRuntimeTelemetry(
                         isConnected: self.connectedAt != nil,
                         activeNodeId: self.activeNodeId,
-                        rxBytes: self.rxBytesCounter,
-                        txBytes: self.txBytesCounter,
-                        connectedSince: self.connectedAt
+                        rxBytes: metrics?.rxBytes ?? 0,
+                        txBytes: metrics?.txBytes ?? 0,
+                        rxSpeed: metrics?.rxSpeed ?? 0,
+                        txSpeed: metrics?.txSpeed ?? 0,
+                        connectedSince: self.connectedAt,
+                        coreStatus: coreStatus
                     )
                 }
+
                 SharedTunnelStore.shared.writeActiveTelemetry(snapshot)
-                try? await Task.sleep(for: .seconds(1))
-            }
-        }
-
-        // TUN packet processor (measures traffic without reflection loop)
-        packetLoopTask = Task.detached(priority: .high) { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                let (packets, _) = await self.readPacketsAsync()
-                if packets.isEmpty {
-                    try? await Task.sleep(for: .milliseconds(50))
-                    continue
-                }
-
-                var batchBytes: UInt64 = 0
-                for pkt in packets {
-                    batchBytes &+= UInt64(pkt.count)
-                }
-
-                self.telemetryLock.withLock {
-                    self.txBytesCounter &+= batchBytes
-                    self.rxBytesCounter &+= UInt64(Double(batchBytes) * 1.15)
-                }
-            }
-        }
-    }
-
-    private func readPacketsAsync() async -> ([Data], [NSNumber]) {
-        await withCheckedContinuation { continuation in
-            packetFlow.readPackets { packets, protocols in
-                continuation.resume(returning: (packets, protocols))
             }
         }
     }

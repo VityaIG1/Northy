@@ -387,6 +387,13 @@ public final class VPNTunnelManager {
             }
         }
 
+        // For the active connected node, use real end-to-end proxy outbound latency if available
+        if isConnected, let activeId = selectedNodeId, let tunnelLatency = await measureActiveTunnelLatency() {
+            if let activeIndex = nodes.firstIndex(where: { $0.id == activeId }) {
+                nodes[activeIndex].latencyMs = tunnelLatency
+            }
+        }
+
         if pingSettings.sortNodesByLatency {
             sortNodesByCurrentLatency()
         } else {
@@ -577,17 +584,46 @@ public final class VPNTunnelManager {
         let currentRx = max(decoded.rxBytes, telemetry.rxBytes)
         let currentTx = max(decoded.txBytes, telemetry.txBytes)
 
-        let deltaRx = currentRx >= lastRxBytes ? (currentRx - lastRxBytes) : 0
-        let deltaTx = currentTx >= lastTxBytes ? (currentTx - lastTxBytes) : 0
+        // Use core-reported speed metrics if non-zero; otherwise compute from interval delta
+        if decoded.rxSpeed > 0 || decoded.txSpeed > 0 {
+            rxSpeedBytesPerSec = decoded.rxSpeed
+            txSpeedBytesPerSec = decoded.txSpeed
+        } else {
+            let deltaRx = currentRx >= lastRxBytes ? (currentRx - lastRxBytes) : 0
+            let deltaTx = currentTx >= lastTxBytes ? (currentTx - lastTxBytes) : 0
+            rxSpeedBytesPerSec = deltaRx
+            txSpeedBytesPerSec = deltaTx
+        }
 
-        rxSpeedBytesPerSec = deltaRx
-        txSpeedBytesPerSec = deltaTx
         lastRxBytes = currentRx
         lastTxBytes = currentTx
         telemetry = decoded
 
         if let remoteDate = decoded.connectedSince, connectedSince == nil {
             connectedSince = remoteDate
+        }
+    }
+
+    /// Measures live proxy round-trip latency through the active tunnel using the core outbound.
+    public func measureActiveTunnelLatency() async -> Int? {
+        guard isConnected, let session = providerManager?.connection as? NETunnelProviderSession else {
+            return nil
+        }
+        let msg = Data(TunnelIPCCommand.measureLatency.rawValue.utf8)
+        return await withCheckedContinuation { continuation in
+            do {
+                try session.sendProviderMessage(msg) { responseData in
+                    guard let responseData,
+                          let dict = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+                          let ms = dict["latencyMs"] as? Int else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    continuation.resume(returning: ms)
+                }
+            } catch {
+                continuation.resume(returning: nil)
+            }
         }
     }
 

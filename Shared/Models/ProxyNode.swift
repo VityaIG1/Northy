@@ -540,19 +540,48 @@ public struct TunnelRuntimeTelemetry: Codable, Sendable {
     public var activeNodeId: UUID?
     public var rxBytes: UInt64
     public var txBytes: UInt64
+    public var rxSpeed: UInt64
+    public var txSpeed: UInt64
     public var connectedSince: Date?
+    public var coreStatus: String
+    public var lastError: String?
 
     public init(
         isConnected: Bool = false,
         activeNodeId: UUID? = nil,
         rxBytes: UInt64 = 0,
         txBytes: UInt64 = 0,
-        connectedSince: Date? = nil
+        rxSpeed: UInt64 = 0,
+        txSpeed: UInt64 = 0,
+        connectedSince: Date? = nil,
+        coreStatus: String = "IDLE",
+        lastError: String? = nil
     ) {
         self.isConnected = isConnected
         self.activeNodeId = activeNodeId
         self.rxBytes = rxBytes
         self.txBytes = txBytes
+        self.rxSpeed = rxSpeed
+        self.txSpeed = txSpeed
         self.connectedSince = connectedSince
+        self.coreStatus = coreStatus
+        self.lastError = lastError
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case isConnected, activeNodeId, rxBytes, txBytes, rxSpeed, txSpeed, connectedSince, coreStatus, lastError
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.isConnected = try container.decodeIfPresent(Bool.self, forKey: .isConnected) ?? false
+        self.activeNodeId = try container.decodeIfPresent(UUID.self, forKey: .activeNodeId)
+        self.rxBytes = try container.decodeIfPresent(UInt64.self, forKey: .rxBytes) ?? 0
+        self.txBytes = try container.decodeIfPresent(UInt64.self, forKey: .txBytes) ?? 0
+        self.rxSpeed = try container.decodeIfPresent(UInt64.self, forKey: .rxSpeed) ?? 0
+        self.txSpeed = try container.decodeIfPresent(UInt64.self, forKey: .txSpeed) ?? 0
+        self.connectedSince = try container.decodeIfPresent(Date.self, forKey: .connectedSince)
+        self.coreStatus = try container.decodeIfPresent(String.self, forKey: .coreStatus) ?? (self.isConnected ? "RUNNING" : "IDLE")
+        self.lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
     }
 }
