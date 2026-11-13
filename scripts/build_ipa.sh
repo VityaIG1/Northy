@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 # ==============================================================================
 # Northy — Automated Signed .ipa Builder for iOS
@@ -44,18 +44,32 @@ fi
 echo "=========================================================="
 echo ">> [2/5] Building Release archive (${SCHEME})..."
 echo "=========================================================="
-xcodebuild \
-  -project "${PROJECT}" \
-  -scheme "${SCHEME}" \
-  -configuration Release \
-  -sdk iphoneos \
-  -destination 'generic/platform=iOS' \
-  -archivePath "${ARCHIVE_PATH}" \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY="" \
-  "${EXTRA_BUILD_FLAGS[@]}" \
-  archive
+if [ ${#EXTRA_BUILD_FLAGS[@]} -gt 0 ]; then
+  xcodebuild \
+    -project "${PROJECT}" \
+    -scheme "${SCHEME}" \
+    -configuration Release \
+    -sdk iphoneos \
+    -destination 'generic/platform=iOS' \
+    -archivePath "${ARCHIVE_PATH}" \
+    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGN_IDENTITY="" \
+    "${EXTRA_BUILD_FLAGS[@]}" \
+    archive
+else
+  xcodebuild \
+    -project "${PROJECT}" \
+    -scheme "${SCHEME}" \
+    -configuration Release \
+    -sdk iphoneos \
+    -destination 'generic/platform=iOS' \
+    -archivePath "${ARCHIVE_PATH}" \
+    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGN_IDENTITY="" \
+    archive
+fi
 
 echo "=========================================================="
 echo ">> [3/5] Extracting compiled app bundle into Payload..."
