@@ -1,5 +1,5 @@
 import Foundation
-import NetworkExtension
+@preconcurrency import NetworkExtension
 import Observation
 import UIKit
 
@@ -450,14 +450,16 @@ public final class VPNTunnelManager {
         ) { [weak self] notification in
             guard let self,
                   let session = notification.object as? NEVPNConnection else { return }
+            let status = session.status
+            let connectedDate = session.connectedDate
             Task { @MainActor in
-                self.connectionStatus = session.status
-                if session.status == .connected {
+                self.connectionStatus = status
+                if status == .connected {
                     if self.connectedSince == nil {
-                        self.connectedSince = session.connectedDate ?? .now
+                        self.connectedSince = connectedDate ?? .now
                     }
                     self.startTelemetryPolling()
-                } else if session.status == .disconnected {
+                } else if status == .disconnected {
                     self.telemetryTimerTask?.cancel()
                     self.telemetry = TunnelRuntimeTelemetry()
                     self.connectedSince = nil
