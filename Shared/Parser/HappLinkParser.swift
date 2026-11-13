@@ -53,14 +53,34 @@ public struct HappLinkParser: Sendable {
             return .remoteSubscriptionURL(url)
         }
 
-        // 2. Check if payload is a Happ custom deep link (`happ://add/...` or `v2raytun://import/...`)
+        // 2. Check if payload is an Incy deep link (`incy://...`)
+        if trimmed.lowercased().hasPrefix("incy://") {
+            if let decoded = decodeIncyDeepLink(trimmed) {
+                if (decoded.lowercased().hasPrefix("https://") || decoded.lowercased().hasPrefix("http://")),
+                   let url = URL(string: decoded) {
+                    return .remoteSubscriptionURL(url)
+                }
+                if let nested = try? parseClipboardPayload(decoded, subscriptionId: subscriptionId) {
+                    return nested
+                }
+            }
+        }
+
+        // 3. Check if payload is a Happ / v2raytun custom deep link
         if trimmed.lowercased().hasPrefix("happ://") || trimmed.lowercased().hasPrefix("v2raytun://") {
             if let extracted = extractEmbeddedURL(from: trimmed) {
                 return .remoteSubscriptionURL(extracted)
             }
         }
 
-        // 3. Check if payload is a raw JSON configuration (Sing-box / Xray outbounds)
+        // 4. Check if payload is a raw WireGuard .conf file
+        if trimmed.contains("[Interface]") && trimmed.contains("[Peer]") {
+            if let wgNode = try? parseWireGuardConf(trimmed, subscriptionId: subscriptionId) {
+                return .nodes([wgNode])
+            }
+        }
+
+        // 5. Check if payload is a raw JSON configuration (Sing-box / Xray outbounds)
         if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
             if let jsonNodes = tryParseJSONNodes(trimmed, subscriptionId: subscriptionId), !jsonNodes.isEmpty {
                 return .nodes(jsonNodes)
@@ -142,6 +162,8 @@ public struct HappLinkParser: Sendable {
             return try parseHysteria2(trimmed, subscriptionId: subscriptionId)
         } else if lower.hasPrefix("tuic://") {
             return try parseTUIC(trimmed, subscriptionId: subscriptionId)
+        } else if lower.hasPrefix("wireguard://") || lower.hasPrefix("wg://") {
+            return try parseWireGuard(trimmed, subscriptionId: subscriptionId)
         } else {
             let scheme = trimmed.components(separatedBy: "://").first ?? "UNKNOWN"
             throw HappParserError.unsupportedScheme(scheme)
@@ -418,6 +440,146 @@ public struct HappLinkParser: Sendable {
         )
     }
 
+    // MARK: - WireGuard Parser (wireguard:// or wg://)
+
+    public static func parseWireGuard(_ uri: String, subscriptionId: UUID?) throws -> ProxyNode {
+        let (sanitizedURI, rawFragment) = splitFragmentSafely(uri)
+        guard let url = URL(string: sanitizedURI),
+              let host = url.host else {
+            throw HappParserError.malformedURI("WIREGUARD_HOST_MISSING")
+        }
+        let port = url.port ?? 51820
+        let privateKey = url.user?.removingPercentEncoding ?? url.user ?? ""
+        guard !privateKey.isEmpty else {
+            throw HappParserError.malformedURI("WIREGUARD_PRIVATE_KEY_MISSING")
+        }
+
+        let query = queryDictionary(from: URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        let publicKey = query["public_key"] ?? query["pubkey"] ?? query["peer_public_key"] ?? ""
+        let address = query["address"] ?? query["ip"] ?? "10.0.0.2/32"
+        let mtu = Int(query["mtu"] ?? "") ?? 1420
+
+        var reserved: [Int]? = nil
+        if let resStr = query["reserved"] {
+            let parts = resStr
+                .replacingOccurrences(of: "[", with: "")
+                .replacingOccurrences(of: "]", with: "")
+                .components(separatedBy: ",")
+                .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            if !parts.isEmpty {
+                reserved = parts
+            }
+        }
+
+        let decodedRemark = rawFragment?.removingPercentEncoding?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remark = (decodedRemark?.isEmpty == false) ? decodedRemark! : "WIREGUARD // \(host)"
+
+        return ProxyNode(
+            remark: remark,
+            protocolType: .wireguard,
+            serverHost: host,
+            serverPort: port,
+            credential: privateKey,
+            encryption: "chacha20-poly1305",
+            transport: .udp,
+            security: .none,
+            subscriptionId: subscriptionId,
+            rawURI: uri,
+            wireguardPublicKey: publicKey,
+            wireguardAddress: address,
+            wireguardMTU: mtu,
+            wireguardReserved: reserved
+        )
+    }
+
+    // MARK: - WireGuard .conf Parser ([Interface] & [Peer])
+
+    public static func parseWireGuardConf(_ text: String, subscriptionId: UUID?) throws -> ProxyNode {
+        var interfaceDict: [String: String] = [:]
+        var peerDict: [String: String] = [:]
+        var currentSection: String = ""
+        var remark: String?
+
+        let lines = text.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+
+            if trimmed.hasPrefix("#") {
+                if remark == nil {
+                    let comment = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                    if !comment.isEmpty && !comment.lowercased().contains("configuration") {
+                        remark = comment
+                    }
+                }
+                continue
+            }
+
+            if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
+                currentSection = String(trimmed.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces).lowercased()
+                continue
+            }
+
+            let parts = trimmed.split(separator: "=", maxSplits: 1).map { String($0).trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2 {
+                let key = parts[0].lowercased()
+                let value = parts[1]
+                if currentSection == "interface" {
+                    interfaceDict[key] = value
+                } else if currentSection == "peer" {
+                    peerDict[key] = value
+                }
+            }
+        }
+
+        guard let privateKey = interfaceDict["privatekey"], !privateKey.isEmpty else {
+            throw HappParserError.malformedURI("WIREGUARD_CONF_PRIVATE_KEY_MISSING")
+        }
+        guard let endpoint = peerDict["endpoint"], !endpoint.isEmpty else {
+            throw HappParserError.malformedURI("WIREGUARD_CONF_ENDPOINT_MISSING")
+        }
+
+        let endpointParts = endpoint.split(separator: ":").map { String($0) }
+        guard endpointParts.count == 2, let port = Int(endpointParts[1]) else {
+            throw HappParserError.malformedURI("WIREGUARD_CONF_ENDPOINT_PORT_INVALID")
+        }
+        let host = endpointParts[0].trimmingCharacters(in: .whitespaces)
+        let publicKey = peerDict["publickey"] ?? ""
+        let address = interfaceDict["address"] ?? "10.0.0.2/32"
+        let mtu = Int(interfaceDict["mtu"] ?? "") ?? 1420
+
+        var reserved: [Int]? = nil
+        if let resStr = peerDict["reserved"] {
+            let parts = resStr
+                .replacingOccurrences(of: "[", with: "")
+                .replacingOccurrences(of: "]", with: "")
+                .components(separatedBy: ",")
+                .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            if !parts.isEmpty {
+                reserved = parts
+            }
+        }
+
+        let nodeRemark = remark ?? "WIREGUARD // \(host)"
+
+        return ProxyNode(
+            remark: nodeRemark,
+            protocolType: .wireguard,
+            serverHost: host,
+            serverPort: port,
+            credential: privateKey,
+            encryption: "chacha20-poly1305",
+            transport: .udp,
+            security: .none,
+            subscriptionId: subscriptionId,
+            rawURI: text,
+            wireguardPublicKey: publicKey,
+            wireguardAddress: address,
+            wireguardMTU: mtu,
+            wireguardReserved: reserved
+        )
+    }
+
     // MARK: - Raw JSON Xray / Sing-box Subscription Profile Parser
 
     public static func tryParseJSONNodes(_ jsonString: String, subscriptionId: UUID?) -> [ProxyNode]? {
@@ -559,6 +721,30 @@ public struct HappLinkParser: Sendable {
                 )
                 result.append(node)
 
+            case "wireguard", "wg":
+                let privateKey = item["private_key"] as? String ?? item["secret_key"] as? String ?? ""
+                let publicKey = item["public_key"] as? String ?? item["peer_public_key"] as? String ?? ""
+                let address = item["local_address"] as? String ?? item["address"] as? String ?? "10.0.0.2/32"
+                let mtu = item["mtu"] as? Int ?? 1420
+                let reserved = item["reserved"] as? [Int]
+                let node = ProxyNode(
+                    remark: tag,
+                    protocolType: .wireguard,
+                    serverHost: server,
+                    serverPort: port,
+                    credential: privateKey,
+                    encryption: "chacha20-poly1305",
+                    transport: .udp,
+                    security: .none,
+                    subscriptionId: subscriptionId,
+                    rawURI: "wg://\(privateKey)@\(server):\(port)#\(tag)",
+                    wireguardPublicKey: publicKey,
+                    wireguardAddress: address,
+                    wireguardMTU: mtu,
+                    wireguardReserved: reserved
+                )
+                result.append(node)
+
             default:
                 break
             }
@@ -679,6 +865,28 @@ public struct HappLinkParser: Sendable {
                 "port": node.serverPort,
                 "uuid": node.credential
             ]]
+        case .wireguard:
+            outboundProtocol = "wireguard"
+            let peerDict: [String: Any] = [
+                "publicKey": node.wireguardPublicKey ?? "",
+                "endpoint": "\(node.serverHost):\(node.serverPort)",
+                "allowedIPs": ["0.0.0.0/0", "::/0"]
+            ]
+            let addresses = (node.wireguardAddress ?? "10.0.0.2/32")
+                .components(separatedBy: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+
+            var wgSettings: [String: Any] = [
+                "secretKey": node.credential,
+                "address": addresses.isEmpty ? ["10.0.0.2/32"] : addresses,
+                "peers": [peerDict],
+                "mtu": node.wireguardMTU ?? 1420
+            ]
+            if let reserved = node.wireguardReserved, !reserved.isEmpty {
+                wgSettings["reserved"] = reserved
+            }
+            outboundSettings = wgSettings
         }
 
         // Sniffing configuration (Happ domain sniffing)
@@ -921,5 +1129,47 @@ public struct HappLinkParser: Sendable {
             return URL(string: urlSubstring.removingPercentEncoding ?? urlSubstring)
         }
         return nil
+    }
+
+    // MARK: - Incy Deep Link Decoder (`incy://...`)
+
+    public static func decodeIncyDeepLink(_ uri: String) -> String? {
+        var payload = uri.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard payload.lowercased().hasPrefix("incy://") else { return nil }
+        payload = String(payload.dropFirst(7))
+
+        if payload.lowercased().hasPrefix("import/") {
+            payload = String(payload.dropFirst(7))
+        } else if payload.lowercased().hasPrefix("sub/") {
+            payload = String(payload.dropFirst(4))
+        } else if payload.lowercased().hasPrefix("add/") {
+            payload = String(payload.dropFirst(4))
+        } else if payload.lowercased().hasPrefix("install-config") {
+            if let components = URLComponents(string: uri),
+               let queryItems = components.queryItems,
+               let urlVal = queryItems.first(where: { $0.name.lowercased() == "url" })?.value {
+                return urlVal
+            }
+        }
+
+        payload = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+        if payload.isEmpty { return nil }
+
+        if payload.lowercased().hasPrefix("https://") || payload.lowercased().hasPrefix("http://") {
+            return payload
+        }
+
+        if let decoded = decodeBase64Flexible(payload) {
+            return decoded
+        }
+
+        if let unescaped = payload.removingPercentEncoding, unescaped != payload {
+            if let decoded = decodeBase64Flexible(unescaped) {
+                return decoded
+            }
+            return unescaped
+        }
+
+        return payload
     }
 }

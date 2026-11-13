@@ -32,6 +32,7 @@ public struct SettingsView: View {
                 connectionAndCoreSection
                 subscriptionGroupsSection
                 supportAuthorsSection
+                openSourceLicensesSection
                 languageSwitcherSection
                 versionFooterBadge
             }
@@ -805,12 +806,40 @@ public struct SettingsView: View {
 
                         dividerLine
 
-                        // User-Agent Override
-                        VStack(alignment: .leading, spacing: 6) {
+                        // User-Agent Override & Profile Selector
+                        VStack(alignment: .leading, spacing: 8) {
                             subLabel(localization.tr("subscription.custom_ua"))
 
+                            // Profile selection chips
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(SubscriptionUserAgentProfile.allCases, id: \.self) { profile in
+                                        let isSelected = vpnManager.subscriptionSettings.userAgentProfile == profile && (vpnManager.subscriptionSettings.customUserAgent == nil || vpnManager.subscriptionSettings.customUserAgent?.isEmpty == true)
+                                        Button {
+                                            var updated = vpnManager.subscriptionSettings
+                                            updated.userAgentProfile = profile
+                                            updated.customUserAgent = nil
+                                            customUAText = ""
+                                            vpnManager.updateSubscriptionSettings(updated)
+                                        } label: {
+                                            Text(profile.shortLabel)
+                                                .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 5)
+                                                .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                                .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                                .overlay(
+                                                    Rectangle().strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                                )
+                                                .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+
                             HStack(spacing: 8) {
-                                TextField("Happ/3.0.0/ios", text: $customUAText)
+                                TextField("Incy/1.0.0/ios", text: $customUAText)
                                     .font(NothingTypography.technicalMono(size: 11, weight: .medium))
                                     .foregroundStyle(NothingPalette.pureWhite)
                                     .autocorrectionDisabled()
@@ -1082,7 +1111,50 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 8. Instant Language Switcher (SYSTEM / РУССКИЙ / ENGLISH)
+    // MARK: - 8. Open Source Licenses & Upstream Attribution
+
+    private var openSourceLicensesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(localization.tr("settings.licenses.header"))
+
+            NothingIndustrialCard(isHighlighted: false) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
+                        Text("INCY CORE")
+                            .font(NothingTypography.technicalMono(size: 12, weight: .bold))
+                            .foregroundStyle(NothingPalette.pureWhite)
+
+                        Text("MIT")
+                            .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .foregroundStyle(NothingPalette.trueBlack)
+                            .background(NothingPalette.pureWhite)
+                            .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+
+                        Spacer()
+
+                        Link(destination: URL(string: "https://github.com/INCY-DEV")!) {
+                            Text("GITHUB ↗")
+                                .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                .foregroundStyle(theme.accentColor)
+                        }
+                    }
+
+                    Text("Northy core architecture, protocol parsers, and VPN tunneling engine is an open-source fork of the Incy client by INCY-DEV, powered by Xray-core.")
+                        .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                        .lineSpacing(2)
+
+                    Text("Copyright (c) 2024-2026 INCY-DEV. Released under the MIT License.")
+                        .font(NothingTypography.technicalMono(size: 9, weight: .regular))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                }
+            }
+        }
+    }
+
+    // MARK: - 9. Instant Language Switcher (SYSTEM / РУССКИЙ / ENGLISH)
 
     private var languageSwitcherSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1123,10 +1195,10 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 9. Dot-Matrix Build Version Indicator (v0.2.0)
+    // MARK: - 10. Dot-Matrix Build Version & Incy Upstream Attribution (v0.2.0)
 
     private var versionFooterBadge: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Rectangle()
                 .fill(NothingPalette.gridStroke)
                 .frame(height: 1)
@@ -1146,6 +1218,20 @@ public struct SettingsView: View {
                     .font(NothingTypography.technicalMono(size: 10, weight: .medium))
                     .foregroundStyle(NothingPalette.mutedGrey)
                     .tracking(1.2)
+            }
+
+            HStack {
+                Text("Fork of incy")
+                    .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                    .foregroundStyle(theme.accentColor)
+                    .tracking(1.2)
+
+                Spacer()
+
+                Text("OPEN SOURCE // CORE ENGINE")
+                    .font(NothingTypography.technicalMono(size: 9, weight: .regular))
+                    .foregroundStyle(NothingPalette.mutedGrey)
+                    .tracking(1.0)
             }
         }
     }

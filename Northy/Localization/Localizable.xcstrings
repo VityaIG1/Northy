@@ -616,6 +616,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Application Developer & Architect" } },
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Разработчик приложения" } }
       }
+    },
+    "settings.licenses.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "LICENSES & ATTRIBUTION" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЛИЦЕНЗИИ И БЛАГОДАРНОСТИ" } }
+      }
     }
   },
   "version" : "1.0"

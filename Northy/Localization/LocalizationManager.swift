@@ -189,7 +189,10 @@ public final class LocalizationManager {
             // Support Authors
             "settings.support.header": "SUPPORT AUTHORS",
             "settings.support.scrt_role": "Idea Author & Concept",
-            "settings.support.vitya_role": "Application Developer & Architect"
+            "settings.support.vitya_role": "Application Developer & Architect",
+
+            // Licenses & Attribution
+            "settings.licenses.header": "LICENSES & ATTRIBUTION"
         ],
         "ru": [
             "app.title": "NOTHING // VPN",
@@ -295,7 +298,10 @@ public final class LocalizationManager {
             // Support Authors
             "settings.support.header": "ПОДДЕРЖКА АВТОРОВ",
             "settings.support.scrt_role": "Автор идеи и концепта",
-            "settings.support.vitya_role": "Разработчик приложения"
+            "settings.support.vitya_role": "Разработчик приложения",
+
+            // Licenses & Attribution
+            "settings.licenses.header": "ЛИЦЕНЗИИ И БЛАГОДАРНОСТИ"
         ]
     ]
 }

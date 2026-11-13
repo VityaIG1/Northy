@@ -9,6 +9,7 @@ public enum ProxyProtocolType: String, Codable, CaseIterable, Sendable {
     case shadowsocks = "SS"
     case hysteria2 = "HY2"
     case tuic = "TUIC"
+    case wireguard = "WG"
 
     public var badgeLabel: String {
         switch self {
@@ -18,6 +19,7 @@ public enum ProxyProtocolType: String, Codable, CaseIterable, Sendable {
         case .shadowsocks: return "SS"
         case .hysteria2: return "HYSTERIA2"
         case .tuic: return "TUIC"
+        case .wireguard: return "WIREGUARD"
         }
     }
 }
@@ -70,6 +72,11 @@ public struct ProxyNode: Identifiable, Codable, Hashable, Sendable {
     public var subscriptionId: UUID?
     /// Original raw URI string
     public var rawURI: String
+    /// WireGuard specific configuration
+    public var wireguardPublicKey: String?
+    public var wireguardAddress: String?
+    public var wireguardMTU: Int?
+    public var wireguardReserved: [Int]?
     /// Last measured RTT in milliseconds (nil if not measured or unreachable)
     public var latencyMs: Int?
     public var createdAt: Date
@@ -94,6 +101,10 @@ public struct ProxyNode: Identifiable, Codable, Hashable, Sendable {
         allowInsecure: Bool = false,
         subscriptionId: UUID? = nil,
         rawURI: String,
+        wireguardPublicKey: String? = nil,
+        wireguardAddress: String? = nil,
+        wireguardMTU: Int? = nil,
+        wireguardReserved: [Int]? = nil,
         latencyMs: Int? = nil,
         createdAt: Date = .now
     ) {
@@ -116,6 +127,10 @@ public struct ProxyNode: Identifiable, Codable, Hashable, Sendable {
         self.allowInsecure = allowInsecure
         self.subscriptionId = subscriptionId
         self.rawURI = rawURI
+        self.wireguardPublicKey = wireguardPublicKey
+        self.wireguardAddress = wireguardAddress
+        self.wireguardMTU = wireguardMTU
+        self.wireguardReserved = wireguardReserved
         self.latencyMs = latencyMs
         self.createdAt = createdAt
     }
@@ -378,9 +393,11 @@ public struct HappConnectionSettings: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Happ Subscription Settings (Настройки подписок & Маскировка Happ)
+// MARK: - Incy / Happ Subscription Settings (Настройки подписок & Маскировка Incy / Happ)
 
 public enum SubscriptionUserAgentProfile: String, Codable, CaseIterable, Sendable {
+    case incyDefault = "Incy/1.0.0/ios"
+    case incyLegacy = "Incy/0.9.8/ios"
     case happDefault = "Happ/3.0.0/ios"
     case happLegacy = "Happ/0.2.0 (iOS; Northy)"
     case v2rayNG = "v2rayNG/1.8.23"
@@ -389,7 +406,9 @@ public enum SubscriptionUserAgentProfile: String, Codable, CaseIterable, Sendabl
 
     public var shortLabel: String {
         switch self {
-        case .happDefault: return "HAPP 3.0 // DEFAULT"
+        case .incyDefault: return "INCY 1.0 // DEFAULT"
+        case .incyLegacy: return "INCY LEGACY"
+        case .happDefault: return "HAPP 3.0"
         case .happLegacy: return "HAPP LEGACY"
         case .v2rayNG: return "V2RAYNG"
         case .clashMeta: return "CLASH.META"
@@ -411,7 +430,7 @@ public struct HappSubscriptionSettings: Codable, Hashable, Sendable {
     public init(
         autoUpdateOnLaunch: Bool = true,
         updateIntervalHours: Int = 6,
-        userAgentProfile: SubscriptionUserAgentProfile = .happDefault,
+        userAgentProfile: SubscriptionUserAgentProfile = .incyDefault,
         pingAfterSync: Bool = true,
         enableHappMasquerading: Bool = true,
         customUserAgent: String? = nil
@@ -425,11 +444,11 @@ public struct HappSubscriptionSettings: Codable, Hashable, Sendable {
     }
 
     public var resolvedUserAgent: String {
+        if let custom = customUserAgent, !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return custom.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if enableHappMasquerading {
-            if let custom = customUserAgent, !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return custom.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            return "Happ/3.0.0/ios"
+            return "Incy/1.0.0/ios"
         }
         return userAgentProfile.rawValue
     }
