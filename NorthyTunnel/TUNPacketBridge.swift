@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import Network
+@preconcurrency import NetworkExtension
 import os.log
 
 // MARK: - Production-Grade TUN Packet Engine & SOCKS5/DNS Flow Router

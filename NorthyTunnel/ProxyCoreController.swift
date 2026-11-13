@@ -127,7 +127,7 @@ public final class ProxyCoreController: @unchecked Sendable {
         }
 
         // Try LibboxNewService: if sing-box is linked
-        if let sym = dlsym(handle, "LibboxNewService") {
+        if dlsym(handle, "LibboxNewService") != nil {
             logger.notice("NORTHY // Found LibboxNewService dynamically")
         }
         #endif

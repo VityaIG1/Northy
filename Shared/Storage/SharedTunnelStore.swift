@@ -281,7 +281,10 @@ public final class SharedTunnelStore: Sendable {
         guard inet_ntop(AF_INET, &addr, &buffer, socklen_t(INET_ADDRSTRLEN)) != nil else {
             return nil
         }
-        return String(cString: buffer)
+        return buffer.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { return nil }
+            return String(cString: base)
+        }
     }
 
     // MARK: - Default Industrial Seed Nodes (Reachable Anycast Edge Hosts for Live Ping Testing)
@@ -358,7 +361,11 @@ public enum HappDeviceFingerprint {
     /// Dynamic system iOS version (e.g. "18.1", "17.5") via `UIDevice.current.systemVersion`.
     public static var systemVersion: String {
         #if canImport(UIKit)
-        return UIDevice.current.systemVersion
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated { UIDevice.current.systemVersion }
+        } else {
+            return DispatchQueue.main.sync { UIDevice.current.systemVersion }
+        }
         #else
         return "18.1"
         #endif

@@ -356,10 +356,10 @@ public struct HappLinkParser: Sendable {
             : sanitizedURI
 
         guard let url = URL(string: normalized),
-              let host = url.host,
-              let port = url.port ?? (url.scheme == "hysteria2" ? 443 : 443) else {
+              let host = url.host else {
             throw HappParserError.malformedURI("HYSTERIA2_HOST_PORT_MISSING")
         }
+        let port = url.port ?? 443
 
         let password = url.user ?? ""
         let query = queryDictionary(from: URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
@@ -388,10 +388,10 @@ public struct HappLinkParser: Sendable {
     public static func parseTUIC(_ uri: String, subscriptionId: UUID?) throws -> ProxyNode {
         let (sanitizedURI, rawFragment) = splitFragmentSafely(uri)
         guard let url = URL(string: sanitizedURI),
-              let host = url.host,
-              let port = url.port ?? 443 else {
+              let host = url.host else {
             throw HappParserError.malformedURI("TUIC_HOST_PORT_MISSING")
         }
+        let port = url.port ?? 443
 
         let userString = url.user ?? ""
         let password = url.password ?? ""
