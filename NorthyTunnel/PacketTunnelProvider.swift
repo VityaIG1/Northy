@@ -74,11 +74,12 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             connection: connectionConfig
         )
 
+        nonisolated(unsafe) let startCompletion = completionHandler
         setTunnelNetworkSettings(networkSettings) { [weak self] error in
             guard let self else { return }
             if let error {
                 self.logger.error("NORTHY // Failed to apply tunnel network settings: \(error.localizedDescription)")
-                completionHandler(error)
+                startCompletion(error)
                 return
             }
 
@@ -96,7 +97,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             self.startPacketFlowBridge(connectionConfig: connectionConfig)
 
             self.logger.notice("NORTHY // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
-            completionHandler(nil)
+            startCompletion(nil)
         }
     }
 
@@ -132,6 +133,8 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             return
         }
 
+        nonisolated(unsafe) let reply = completionHandler
+
         switch command {
         case .queryTelemetry:
             let metrics = tunBridge?.currentMetrics
@@ -149,7 +152,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                 )
             }
             let encoded = try? JSONEncoder().encode(snapshot)
-            completionHandler?(encoded)
+            reply?(encoded)
 
         case .reloadRouting:
             let store = SharedTunnelStore.shared
@@ -165,30 +168,29 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                     connection: connection
                 )
                 setTunnelNetworkSettings(updatedSettings) { _ in
-                    completionHandler?(Data("OK".utf8))
+                    reply?(Data("OK".utf8))
                 }
             } else {
-                completionHandler?(Data("NO_NODE".utf8))
+                reply?(Data("NO_NODE".utf8))
             }
 
         case .measureLatency:
-            Task {
-                let latencyMs = await self.coreController.measureOutboundLatency()
+            coreController.measureOutboundLatency { latencyMs in
                 let responseDict: [String: Any] = [
                     "latencyMs": latencyMs as Any,
                     "status": latencyMs != nil ? "OK" : "TIMEOUT"
                 ]
                 let data = try? JSONSerialization.data(withJSONObject: responseDict)
-                completionHandler?(data)
+                reply?(data)
             }
 
         case .queryCoreStatus:
             let status = coreController.statusDescription
-            completionHandler?(Data(status.utf8))
+            reply?(Data(status.utf8))
 
         case .stopTunnel:
             cancelTunnelWithError(nil)
-            completionHandler?(Data("STOPPED".utf8))
+            reply?(Data("STOPPED".utf8))
         }
     }
 

@@ -153,8 +153,9 @@ public final class ProxyCoreController: @unchecked Sendable {
     public func measureOutboundLatency(
         testURL: URL = URL(string: "http://cp.cloudflare.com/generate_204")!,
         proxyPort: Int = 10809,
-        timeout: TimeInterval = 4.0
-    ) async -> Int? {
+        timeout: TimeInterval = 4.0,
+        completion: @escaping @Sendable (Int?) -> Void
+    ) {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
@@ -166,20 +167,30 @@ public final class ProxyCoreController: @unchecked Sendable {
 
         let session = URLSession(configuration: configuration)
         let startTime = CFAbsoluteTimeGetCurrent()
+        var request = URLRequest(url: testURL)
+        request.httpMethod = "HEAD"
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
-        do {
-            var request = URLRequest(url: testURL)
-            request.httpMethod = "HEAD"
-            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-            let (_, response) = try await session.data(for: request)
+        let task = session.dataTask(with: request) { _, response, _ in
             let elapsed = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000.0)
-
             if let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode) {
-                return max(1, elapsed)
+                completion(max(1, elapsed))
+            } else {
+                completion(nil)
             }
-            return nil
-        } catch {
-            return nil
+        }
+        task.resume()
+    }
+
+    public func measureOutboundLatency(
+        testURL: URL = URL(string: "http://cp.cloudflare.com/generate_204")!,
+        proxyPort: Int = 10809,
+        timeout: TimeInterval = 4.0
+    ) async -> Int? {
+        await withCheckedContinuation { continuation in
+            measureOutboundLatency(testURL: testURL, proxyPort: proxyPort, timeout: timeout) { ms in
+                continuation.resume(returning: ms)
+            }
         }
     }
 }
