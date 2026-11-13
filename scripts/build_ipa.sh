@@ -20,7 +20,7 @@ ARCHIVE_PATH="${BUILD_DIR}/Northy.xcarchive"
 PAYLOAD_DIR="${BUILD_DIR}/Payload"
 APP_DIR="${PAYLOAD_DIR}/Northy.app"
 TUNNEL_DIR="${APP_DIR}/PlugIns/NorthyTunnel.appex"
-OUTPUT_NAME="Northy-v0.1.0-signed.ipa"
+OUTPUT_NAME="Northy-v0.2.0-signed.ipa"
 OUTPUT_IPA="${BUILD_DIR}/${OUTPUT_NAME}"
 
 rm -rf "${BUILD_DIR}"
@@ -35,8 +35,8 @@ EXTRA_BUILD_FLAGS=()
 if [ -n "${SDK_VERSION}" ]; then
   SDK_MAJOR=$(echo "${SDK_VERSION}" | cut -d. -f1)
   echo ">> Detected iOS SDK version: ${SDK_VERSION}"
-  if [ "${SDK_MAJOR}" -lt 26 ] 2>/dev/null; then
-    echo ">> Note: Host SDK is iOS ${SDK_VERSION} (< 26.0). Aligning deployment target..."
+  if [ "${SDK_MAJOR}" -lt 17 ] 2>/dev/null; then
+    echo ">> Note: Host SDK is iOS ${SDK_VERSION} (< 17.0). Aligning deployment target..."
     EXTRA_BUILD_FLAGS+=("IPHONEOS_DEPLOYMENT_TARGET=${SDK_VERSION}")
   fi
 fi

@@ -469,6 +469,97 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "SESSION UPTIME" } },
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВРЕМЯ СЕССИИ" } }
       }
+    },
+    "settings.appearance.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "APPEARANCE & THEME" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВНЕШНИЙ ВИД И ТЕМА" } }
+      }
+    },
+    "settings.appearance.rounded_corners" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ROUNDED CORNERS" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СКРУГЛЕННЫЕ КРАЯ" } }
+      }
+    },
+    "settings.appearance.rounded_corners_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Applied to containers, cards and buttons. Matrix glyphs preserve dot geometry." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Применяется к карточкам, кнопкам и полям ввода. Матричные глифы сохраняют геометрию." } }
+      }
+    },
+    "settings.appearance.accent_color" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ACCENT THEME // COLOR PICKER" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ТЕМА АКЦЕНТА // ВЫБОР ЦВЕТА" } }
+      }
+    },
+    "settings.appearance.accent_red" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "NOTHING RED" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "NOTHING КРАСНЫЙ" } }
+      }
+    },
+    "settings.appearance.accent_white" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ELECTRIC WHITE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "БЕЛЫЙ" } }
+      }
+    },
+    "settings.appearance.accent_amber" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CYBER AMBER" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЯНТАРНЫЙ" } }
+      }
+    },
+    "settings.appearance.accent_cyan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "MATRIX CYAN" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "НЕОНОВЫЙ ЦИАН" } }
+      }
+    },
+    "settings.appearance.accent_gray" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "STEALTH GRAY" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СЕРЫЙ" } }
+      }
+    },
+    "settings.routing.cidrs.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CUSTOM BYPASS SUBNETS (CIDR)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СПИСОК ИСКЛЮЧЕНИЙ ПОДСЕТЕЙ (CIDR)" } }
+      }
+    },
+    "settings.support.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SUPPORT AUTHORS" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПОДДЕРЖКА АВТОРОВ" } }
+      }
+    },
+    "settings.support.scrt_role" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Idea Author & Concept" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Автор идеи и концепта" } }
+      }
+    },
+    "settings.support.vitya_role" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Application Developer & Architect" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Разработчик приложения" } }
+      }
     }
   },
   "version" : "1.0"

@@ -150,6 +150,7 @@ public struct ServersView: View {
                         x: 0,
                         y: 0
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: ThemeManager.shared.buttonCornerRadius))
                 }
                 .buttonStyle(.plain)
             }
@@ -278,6 +279,7 @@ public struct ServersView: View {
                     .font(NothingTypography.technicalMono(size: 13, weight: .black))
                     .foregroundStyle(isActive ? accentColor : NothingPalette.mutedGrey)
             }
+            .clipShape(RoundedRectangle(cornerRadius: ThemeManager.shared.chipCornerRadius))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -286,7 +288,8 @@ public struct ServersView: View {
                     .tracking(0.9)
 
                 Text(value)
-                    .font(NothingTypography.dotMatrixDisplay(size: 15))
+                    .font(NothingTypography.technicalMono(size: 15, weight: .bold))
+                    .monospacedDigit()
                     .foregroundStyle(isActive ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
                     .lineLimit(1)
             }
@@ -305,6 +308,7 @@ public struct ServersView: View {
 
             Text(value)
                 .font(NothingTypography.technicalMono(size: 12, weight: .bold))
+                .monospacedDigit()
                 .foregroundStyle(isActive ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
                 .lineLimit(1)
         }
@@ -339,6 +343,7 @@ public struct ServersView: View {
                             .font(NothingTypography.technicalMono(size: 14, weight: .black))
                             .foregroundStyle(NothingPalette.pureWhite)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: ThemeManager.shared.chipCornerRadius))
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(localization.tr("paste.button"))
@@ -432,6 +437,7 @@ public struct ServersView: View {
                     Rectangle()
                         .fill(isSelected ? NothingPalette.accentRed : NothingPalette.gridStroke)
                         .frame(width: 4, height: 42)
+                        .clipShape(RoundedRectangle(cornerRadius: ThemeManager.shared.isRoundedCorners ? 2 : 0))
 
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
@@ -441,6 +447,7 @@ public struct ServersView: View {
                                 .padding(.vertical, 2)
                                 .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
                                 .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                .clipShape(RoundedRectangle(cornerRadius: ThemeManager.shared.chipCornerRadius))
 
                             Text(node.remark)
                                 .font(NothingTypography.technicalMono(size: 13, weight: .bold))

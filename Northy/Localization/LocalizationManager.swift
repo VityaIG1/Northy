@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-// MARK: - Instant In-App Language Switcher (iOS 26 @Observable)
+// MARK: - Instant In-App Language Switcher (@Observable)
 
 public enum AppLanguageOption: String, CaseIterable, Identifiable, Sendable {
     case system = "system"
@@ -162,7 +162,26 @@ public final class LocalizationManager {
             "settings.language.header": "INTERFACE LANGUAGE",
             "language.system": "SYSTEM",
             "language.english": "ENGLISH",
-            "language.russian": "РУССКИЙ"
+            "language.russian": "РУССКИЙ",
+
+            // Appearance & Themes
+            "settings.appearance.header": "APPEARANCE & THEME",
+            "settings.appearance.rounded_corners": "ROUNDED CORNERS",
+            "settings.appearance.rounded_corners_desc": "Applied to UI containers, cards and buttons. Matrix glyphs preserve dot geometry.",
+            "settings.appearance.accent_color": "ACCENT THEME // COLOR PICKER",
+            "settings.appearance.accent_red": "NOTHING RED",
+            "settings.appearance.accent_white": "ELECTRIC WHITE",
+            "settings.appearance.accent_amber": "CYBER AMBER",
+            "settings.appearance.accent_cyan": "MATRIX CYAN",
+            "settings.appearance.accent_gray": "STEALTH GRAY",
+
+            // Routing CIDRs
+            "settings.routing.cidrs.header": "CUSTOM BYPASS SUBNETS (CIDR)",
+
+            // Support Authors
+            "settings.support.header": "SUPPORT AUTHORS",
+            "settings.support.scrt_role": "Idea Author & Concept",
+            "settings.support.vitya_role": "Application Developer & Architect"
         ],
         "ru": [
             "app.title": "NOTHING // VPN",
@@ -241,7 +260,26 @@ public final class LocalizationManager {
             "settings.language.header": "ЯЗЫК ИНТЕРФЕЙСА",
             "language.system": "СИСТЕМНЫЙ",
             "language.english": "ENGLISH",
-            "language.russian": "РУССКИЙ"
+            "language.russian": "РУССКИЙ",
+
+            // Appearance & Themes
+            "settings.appearance.header": "ВНЕШНИЙ ВИД И ТЕМА",
+            "settings.appearance.rounded_corners": "СКРУГЛЕННЫЕ КРАЯ",
+            "settings.appearance.rounded_corners_desc": "Применяется к карточкам, кнопкам и полям ввода. Матричные глифы сохраняют геометрию.",
+            "settings.appearance.accent_color": "ТЕМА АКЦЕНТА // ВЫБОР ЦВЕТА",
+            "settings.appearance.accent_red": "NOTHING КРАСНЫЙ",
+            "settings.appearance.accent_white": "БЕЛЫЙ",
+            "settings.appearance.accent_amber": "ЯНТАРНЫЙ",
+            "settings.appearance.accent_cyan": "НЕОНОВЫЙ ЦИАН",
+            "settings.appearance.accent_gray": "СЕРЫЙ",
+
+            // Routing CIDRs
+            "settings.routing.cidrs.header": "СПИСОК ИСКЛЮЧЕНИЙ ПОДСЕТЕЙ (CIDR)",
+
+            // Support Authors
+            "settings.support.header": "ПОДДЕРЖКА АВТОРОВ",
+            "settings.support.scrt_role": "Автор идеи и концепта",
+            "settings.support.vitya_role": "Разработчик приложения"
         ]
     ]
 }

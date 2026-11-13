@@ -1,6 +1,106 @@
 import SwiftUI
+import Observation
 
-// MARK: - Nothing OS Industrial Design Tokens (iOS 26+)
+// MARK: - Dynamic Theme State (Accent Color & Industrial Rounded Corners)
+
+@Observable
+@MainActor
+public final class ThemeManager {
+    public static let shared = ThemeManager()
+
+    private enum StorageKeys {
+        static let isRoundedCorners = "northy.theme.is_rounded_corners.v2"
+        static let accentHex = "northy.theme.accent_hex.v2"
+    }
+
+    public static let defaultAccentHex = "#D71921"
+
+    public var isRoundedCorners: Bool {
+        didSet {
+            UserDefaults.standard.set(isRoundedCorners, forKey: StorageKeys.isRoundedCorners)
+        }
+    }
+
+    public var accentHex: String {
+        didSet {
+            UserDefaults.standard.set(accentHex, forKey: StorageKeys.accentHex)
+        }
+    }
+
+    /// Card & container corner radius (0pt sharp vs 18pt rounded)
+    public var cornerRadius: CGFloat {
+        isRoundedCorners ? 18.0 : 0.0
+    }
+
+    /// Button corner radius (0pt sharp vs 14pt rounded)
+    public var buttonCornerRadius: CGFloat {
+        isRoundedCorners ? 14.0 : 0.0
+    }
+
+    /// Small badge / chip corner radius (0pt sharp vs 8pt rounded)
+    public var chipCornerRadius: CGFloat {
+        isRoundedCorners ? 8.0 : 0.0
+    }
+
+    public var accentColor: Color {
+        Color(hex: accentHex) ?? NothingPalette.defaultAccentRed
+    }
+
+    public static let presetSwatches: [(nameKey: String, hex: String, color: Color)] = [
+        ("settings.appearance.accent_red", "#D71921", Color(red: 0.843, green: 0.098, blue: 0.129)),
+        ("settings.appearance.accent_white", "#EEEEEE", Color(red: 0.933, green: 0.933, blue: 0.933)),
+        ("settings.appearance.accent_amber", "#FF7A00", Color(red: 1.0, green: 0.478, blue: 0.0)),
+        ("settings.appearance.accent_cyan", "#00FF85", Color(red: 0.0, green: 1.0, blue: 0.522)),
+        ("settings.appearance.accent_gray", "#888888", Color(red: 0.533, green: 0.533, blue: 0.533))
+    ]
+
+    private init() {
+        self.isRoundedCorners = UserDefaults.standard.bool(forKey: StorageKeys.isRoundedCorners)
+        let savedHex = UserDefaults.standard.string(forKey: StorageKeys.accentHex) ?? Self.defaultAccentHex
+        self.accentHex = savedHex
+    }
+}
+
+extension Color {
+    public init?(hex: String) {
+        var cleanHex = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if cleanHex.hasPrefix("#") {
+            cleanHex.removeFirst()
+        }
+        guard cleanHex.count == 6 || cleanHex.count == 8,
+              let intVal = UInt64(cleanHex, radix: 16) else {
+            return nil
+        }
+        if cleanHex.count == 6 {
+            let r = Double((intVal >> 16) & 0xFF) / 255.0
+            let g = Double((intVal >> 8) & 0xFF) / 255.0
+            let b = Double(intVal & 0xFF) / 255.0
+            self.init(red: r, green: g, blue: b)
+        } else {
+            let r = Double((intVal >> 24) & 0xFF) / 255.0
+            let g = Double((intVal >> 16) & 0xFF) / 255.0
+            let b = Double((intVal >> 8) & 0xFF) / 255.0
+            let a = Double(intVal & 0xFF) / 255.0
+            self.init(red: r, green: g, blue: b, opacity: a)
+        }
+    }
+
+    public func toHex() -> String {
+        #if canImport(UIKit)
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let rgb = (Int(r * 255) << 16) | (Int(g * 255) << 8) | Int(b * 255)
+        return String(format: "#%06X", rgb)
+        #else
+        return "#D71921"
+        #endif
+    }
+}
+
+// MARK: - Nothing OS Industrial Design Tokens
 
 public enum NothingPalette {
     /// Deep OLED Black (`#000000`)
@@ -18,7 +118,11 @@ public enum NothingPalette {
     /// Dim Matrix Dot (`#38383F`)
     public static let dimMatrixDot = Color(red: 0.22, green: 0.22, blue: 0.247)
     /// Signature Nothing OS Accent Red (`#D71921`)
-    public static let accentRed = Color(red: 0.843, green: 0.098, blue: 0.129)
+    public static let defaultAccentRed = Color(red: 0.843, green: 0.098, blue: 0.129)
+    /// Dynamic User Accent Color (Default Nothing Red `#D71921`)
+    public static var accentRed: Color {
+        ThemeManager.shared.accentColor
+    }
 }
 
 // MARK: - Nothing OS Typography Modifiers
@@ -395,39 +499,70 @@ public struct NothingStatusLEDDot: View {
 // MARK: - Industrial Geometric Container with Corner Crosshairs & Optional Glow
 
 public struct NothingIndustrialCard<Content: View>: View {
-    private let borderColor: Color
-    private let accentCornerColor: Color
-    private let glowColor: Color
+    private let isHighlighted: Bool
+    private let glowAccent: Bool
+    private let customBorderColor: Color?
+    private let customAccentCornerColor: Color?
+    private let customGlowColor: Color?
     private let content: Content
 
     public init(
         isHighlighted: Bool = false,
         glowAccent: Bool = false,
+        borderColor: Color? = nil,
+        accentCornerColor: Color? = nil,
+        glowColor: Color? = nil,
         @ViewBuilder content: () -> Content
     ) {
-        self.borderColor = isHighlighted ? NothingPalette.pureWhite : NothingPalette.gridStroke
-        self.accentCornerColor = isHighlighted ? NothingPalette.accentRed : NothingPalette.mutedGrey
-        self.glowColor = glowAccent ? NothingPalette.accentRed.opacity(0.24) : Color.clear
+        self.isHighlighted = isHighlighted
+        self.glowAccent = glowAccent
+        self.customBorderColor = borderColor
+        self.customAccentCornerColor = accentCornerColor
+        self.customGlowColor = glowColor
         self.content = content()
     }
 
     public var body: some View {
-        content
-            .padding(16)
-            .background(NothingPalette.surfacePrimary)
-            .overlay(
-                Rectangle()
-                    .strokeBorder(borderColor, lineWidth: 1)
-            )
-            .overlay(alignment: .topLeading) {
-                CornerTick(color: accentCornerColor)
+        let theme = ThemeManager.shared
+        let accent = theme.accentColor
+        let borderColor = customBorderColor ?? (isHighlighted ? NothingPalette.pureWhite : NothingPalette.gridStroke)
+        let accentCornerColor = customAccentCornerColor ?? (isHighlighted ? accent : NothingPalette.mutedGrey)
+        let glowColor = customGlowColor ?? (glowAccent ? accent.opacity(0.24) : Color.clear)
+        let radius = theme.cornerRadius
+
+        Group {
+            if radius > 0 {
+                content
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: radius)
+                            .fill(NothingPalette.surfacePrimary)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius)
+                            .strokeBorder(borderColor, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: radius))
+            } else {
+                content
+                    .padding(16)
+                    .background(NothingPalette.surfacePrimary)
+                    .overlay(
+                        Rectangle()
+                            .strokeBorder(borderColor, lineWidth: 1)
+                    )
+                    .overlay(alignment: .topLeading) {
+                        CornerTick(color: accentCornerColor)
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        CornerTick(color: accentCornerColor)
+                            .rotationEffect(.degrees(180))
+                    }
             }
-            .overlay(alignment: .bottomTrailing) {
-                CornerTick(color: accentCornerColor)
-                    .rotationEffect(.degrees(180))
-            }
-            .shadow(color: glowColor, radius: 14, x: 0, y: 0)
-            .animation(.easeInOut(duration: 0.35), value: glowColor)
+        }
+        .shadow(color: glowColor, radius: 14, x: 0, y: 0)
+        .animation(.easeInOut(duration: 0.35), value: glowColor)
+        .animation(.snappy(duration: 0.22), value: radius)
     }
 
     private struct CornerTick: View {
@@ -457,6 +592,10 @@ public struct NothingMechanicalSwitch: View {
     }
 
     public var body: some View {
+        let theme = ThemeManager.shared
+        let accent = theme.accentColor
+        let isRounded = theme.isRoundedCorners
+
         Button {
             withAnimation(.snappy(duration: 0.18)) {
                 isOn.toggle()
@@ -471,18 +610,33 @@ public struct NothingMechanicalSwitch: View {
                 Spacer()
 
                 ZStack(alignment: isOn ? .trailing : .leading) {
-                    Rectangle()
-                        .fill(isOn ? NothingPalette.accentRed.opacity(0.22) : NothingPalette.trueBlack)
-                        .frame(width: 52, height: 26)
-                        .overlay(
-                            Rectangle()
-                                .strokeBorder(isOn ? NothingPalette.accentRed : NothingPalette.gridStroke, lineWidth: 1)
-                        )
+                    if isRounded {
+                        RoundedRectangle(cornerRadius: 13)
+                            .fill(isOn ? accent.opacity(0.22) : NothingPalette.trueBlack)
+                            .frame(width: 52, height: 26)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 13)
+                                    .strokeBorder(isOn ? accent : NothingPalette.gridStroke, lineWidth: 1)
+                            )
 
-                    Rectangle()
-                        .fill(isOn ? NothingPalette.accentRed : NothingPalette.mutedGrey)
-                        .frame(width: 22, height: 20)
-                        .padding(.horizontal, 3)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(isOn ? accent : NothingPalette.mutedGrey)
+                            .frame(width: 22, height: 20)
+                            .padding(.horizontal, 3)
+                    } else {
+                        Rectangle()
+                            .fill(isOn ? accent.opacity(0.22) : NothingPalette.trueBlack)
+                            .frame(width: 52, height: 26)
+                            .overlay(
+                                Rectangle()
+                                    .strokeBorder(isOn ? accent : NothingPalette.gridStroke, lineWidth: 1)
+                            )
+
+                        Rectangle()
+                            .fill(isOn ? accent : NothingPalette.mutedGrey)
+                            .frame(width: 22, height: 20)
+                            .padding(.horizontal, 3)
+                    }
                 }
             }
             .contentShape(Rectangle())

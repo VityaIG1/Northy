@@ -1,11 +1,12 @@
 import SwiftUI
 
-// MARK: - Northy Main Application Entry Point (iOS 26.0+)
+// MARK: - Northy Main Application Entry Point
 
 @main
 public struct NorthyApp: App {
     @State private var localization = LocalizationManager()
     @State private var vpnManager = VPNTunnelManager()
+    @State private var theme = ThemeManager.shared
     @State private var activeTab: NothingNavigationTab = .servers
 
     public init() {}
@@ -15,6 +16,7 @@ public struct NorthyApp: App {
             NothingRootShellView(
                 vpnManager: vpnManager,
                 localization: localization,
+                theme: theme,
                 activeTab: $activeTab
             )
             .preferredColorScheme(.dark)
@@ -26,6 +28,7 @@ public struct NorthyApp: App {
 public struct NothingRootShellView: View {
     @Bindable var vpnManager: VPNTunnelManager
     @Bindable var localization: LocalizationManager
+    @Bindable var theme: ThemeManager
     @Binding var activeTab: NothingNavigationTab
 
     public var body: some View {

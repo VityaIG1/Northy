@@ -1,16 +1,19 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Tab 02: SETTINGS (Full Happ Parity: Ping, Connection/Core, Routing, DoH DNS, Subscriptions, Language, v0.1.0)
+// MARK: - Tab 02: SETTINGS (Appearance, Network & Routing, DNS, Diagnostics, Core/DPI, Subscriptions, Authors, About — v0.2.0)
 
 public struct SettingsView: View {
     @Bindable var vpnManager: VPNTunnelManager
     @Bindable var localization: LocalizationManager
 
+    @State private var theme = ThemeManager.shared
     @State private var showCoreJSONPreview = false
+    @State private var customHexInput: String = ""
+    @State private var newCIDRInput: String = ""
 
-    public static let marketingVersion = "0.1.0"
-    public static let buildNumber = "1"
+    public static let marketingVersion = "0.2.0"
+    public static let buildNumber = "2"
 
     public init(vpnManager: VPNTunnelManager, localization: LocalizationManager) {
         self.vpnManager = vpnManager
@@ -19,566 +22,138 @@ public struct SettingsView: View {
 
     public var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                languageSwitcherSection
+            VStack(alignment: .leading, spacing: 22) {
+                appearanceSection
+                networkAndRoutingSection
+                dnsResolverSection
                 pingDiagnosticsSection
                 connectionAndCoreSection
-                routingAndSplitTunnelSection
-                dnsResolverSection
                 subscriptionGroupsSection
+                supportAuthorsSection
+                languageSwitcherSection
                 versionFooterBadge
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
-            .padding(.bottom, 32)
+            .padding(.bottom, 36)
         }
         .background(NothingPalette.trueBlack)
-    }
-
-    // MARK: - 1. Instant Language Switcher (SYSTEM / РУССКИЙ / ENGLISH)
-
-    private var languageSwitcherSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(localization.tr("settings.language.header"))
-
-            NothingIndustrialCard(isHighlighted: false) {
-                HStack(spacing: 8) {
-                    ForEach(AppLanguageOption.allCases) { option in
-                        let isSelected = localization.selectedOption == option
-                        Button {
-                            withAnimation(.snappy(duration: 0.16)) {
-                                localization.selectedOption = option
-                            }
-                        } label: {
-                            VStack(spacing: 4) {
-                                Text(localization.tr(option.titleKey))
-                                    .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                                    .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                    .tracking(1.1)
-
-                                Rectangle()
-                                    .fill(isSelected ? NothingPalette.accentRed : Color.clear)
-                                    .frame(width: 14, height: 2)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                            .overlay(
-                                Rectangle()
-                                    .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+        .onAppear {
+            customHexInput = theme.accentHex
         }
     }
 
-    // MARK: - 2. Happ Ping & Latency Diagnostics Settings
+    // MARK: - 1. Appearance Section (Rounded Corners & Accent Theme)
 
-    private var pingDiagnosticsSection: some View {
+    private var appearanceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(localization.tr("settings.ping.header"))
+            sectionHeader(localization.tr("settings.appearance.header"))
 
             NothingIndustrialCard(isHighlighted: false) {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Ping Type: TCP / VIA PROXY (HTTP 204) / ICMP
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("ping.method.header"))
-
-                        HStack(spacing: 8) {
-                            ForEach(PingMeasurementMethod.allCases, id: \.rawValue) { method in
-                                let isSelected = vpnManager.pingSettings.method == method
-                                Button {
-                                    var updated = vpnManager.pingSettings
-                                    updated.method = method
-                                    vpnManager.updatePingSettings(updated)
-                                } label: {
-                                    Text(localization.tr(method.localizationKey))
-                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 36)
-                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    // Ping Test URL (HTTP 204 Endpoint)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("ping.url.header"))
-
-                        VStack(spacing: 6) {
-                            ForEach(PingTestURLPreset.allCases, id: \.rawValue) { preset in
-                                let isSelected = vpnManager.pingSettings.testURLPreset == preset
-                                Button {
-                                    var updated = vpnManager.pingSettings
-                                    updated.testURLPreset = preset
-                                    vpnManager.updatePingSettings(updated)
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Rectangle()
-                                            .fill(isSelected ? NothingPalette.accentRed : NothingPalette.dimMatrixDot)
-                                            .frame(width: 7, height: 7)
-
-                                        Text(preset.displayName)
-                                            .font(NothingTypography.technicalMono(size: 10, weight: isSelected ? .bold : .regular))
-                                            .foregroundStyle(isSelected ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
-                                            .lineLimit(1)
-
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 32)
-                                    .background(isSelected ? NothingPalette.surfaceElevated : NothingPalette.trueBlack)
-                                    .overlay(
-                                        Rectangle()
-                                            .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    // Timeout Selector (1.5s / 3.0s / 5.0s) & Display Format
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            subLabel(localization.tr("ping.timeout.header"))
-
-                            HStack(spacing: 6) {
-                                ForEach(HappPingSettings.availableTimeouts, id: \.self) { timeout in
-                                    let isSelected = abs(vpnManager.pingSettings.timeoutSeconds - timeout) < 0.05
-                                    Button {
-                                        var updated = vpnManager.pingSettings
-                                        updated.timeoutSeconds = timeout
-                                        vpnManager.updatePingSettings(updated)
-                                    } label: {
-                                        Text(String(format: "%.1fS", timeout))
-                                            .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                                            .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 32)
-                                            .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                            .overlay(
-                                                Rectangle()
-                                                    .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-
-                    // Display Format (MS + BARS vs BARS ONLY)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("ping.display.header"))
-
-                        HStack(spacing: 8) {
-                            ForEach(PingResultDisplayMode.allCases, id: \.rawValue) { mode in
-                                let isSelected = vpnManager.pingSettings.displayMode == mode
-                                Button {
-                                    var updated = vpnManager.pingSettings
-                                    updated.displayMode = mode
-                                    vpnManager.updatePingSettings(updated)
-                                } label: {
-                                    Text(localization.tr(mode.localizationKey))
-                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 34)
-                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    dividerLine
-
-                    NothingMechanicalSwitch(
-                        label: localization.tr("ping.sort"),
-                        isOn: Binding(
-                            get: { vpnManager.pingSettings.sortNodesByLatency },
-                            set: { newValue in
-                                var updated = vpnManager.pingSettings
-                                updated.sortNodesByLatency = newValue
-                                vpnManager.updatePingSettings(updated)
-                            }
-                        )
-                    )
-
-                    dividerLine
-
-                    NothingMechanicalSwitch(
-                        label: localization.tr("ping.autostart"),
-                        isOn: Binding(
-                            get: { vpnManager.pingSettings.autoPingOnStartup },
-                            set: { newValue in
-                                var updated = vpnManager.pingSettings
-                                updated.autoPingOnStartup = newValue
-                                vpnManager.updatePingSettings(updated)
-                            }
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    // MARK: - 3. Happ Connection & Xray Core Settings (TUN/Proxy, Sniffing, Mux, TLS Fragment, TFO, MTU)
-
-    private var connectionAndCoreSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(localization.tr("settings.connection.header"))
-
-            NothingIndustrialCard(isHighlighted: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Tunnel Execution Mode (TUN vs Proxy-Only)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("connection.mode.header"))
-
-                        VStack(spacing: 6) {
-                            ForEach(TunnelExecutionMode.allCases, id: \.rawValue) { mode in
-                                let isSelected = vpnManager.connectionSettings.tunnelMode == mode
-                                Button {
-                                    var updated = vpnManager.connectionSettings
-                                    updated.tunnelMode = mode
-                                    vpnManager.updateConnectionSettings(updated)
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Rectangle()
-                                            .fill(isSelected ? NothingPalette.accentRed : NothingPalette.dimMatrixDot)
-                                            .frame(width: 8, height: 8)
-
-                                        Text(localization.tr(mode.localizationKey))
-                                            .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                                            .foregroundStyle(NothingPalette.pureWhite)
-
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 36)
-                                    .background(isSelected ? NothingPalette.surfaceElevated : NothingPalette.trueBlack)
-                                    .overlay(
-                                        Rectangle()
-                                            .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    dividerLine
-
-                    // Traffic Sniffing
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.sniffing"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.enableSniffing },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.enableSniffing = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
-
-                    if vpnManager.connectionSettings.enableSniffing {
+                    // Rounded Corners Toggle
+                    VStack(alignment: .leading, spacing: 6) {
                         NothingMechanicalSwitch(
-                            label: localization.tr("connection.sniff.override"),
+                            label: localization.tr("settings.appearance.rounded_corners"),
                             isOn: Binding(
-                                get: { vpnManager.connectionSettings.sniffOverrideDestination },
-                                set: { newValue in
-                                    var updated = vpnManager.connectionSettings
-                                    updated.sniffOverrideDestination = newValue
-                                    vpnManager.updateConnectionSettings(updated)
-                                }
+                                get: { theme.isRoundedCorners },
+                                set: { theme.isRoundedCorners = $0 }
                             )
                         )
+
+                        Text(localization.tr("settings.appearance.rounded_corners_desc"))
+                            .font(NothingTypography.technicalMono(size: 9, weight: .regular))
+                            .foregroundStyle(NothingPalette.mutedGrey)
+                            .lineLimit(2)
                     }
 
                     dividerLine
 
-                    // TLS ClientHello Fragmentation (Happ DPI Bypass)
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.fragment"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.enableTLSFragment },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.enableTLSFragment = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
+                    // Accent Theme Swatches
+                    VStack(alignment: .leading, spacing: 10) {
+                        subLabel(localization.tr("settings.appearance.accent_color"))
 
-                    if vpnManager.connectionSettings.enableTLSFragment {
-                        VStack(alignment: .leading, spacing: 8) {
-                            subLabel(localization.tr("connection.fragment.preset"))
-
-                            HStack(spacing: 6) {
-                                ForEach(TLSFragmentPreset.allCases, id: \.rawValue) { preset in
-                                    let isSelected = vpnManager.connectionSettings.tlsFragmentPreset == preset
-                                    Button {
-                                        var updated = vpnManager.connectionSettings
-                                        updated.tlsFragmentPreset = preset
-                                        vpnManager.updateConnectionSettings(updated)
-                                    } label: {
-                                        Text(preset.label)
-                                            .font(NothingTypography.technicalMono(size: 9, weight: .bold))
-                                            .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 32)
-                                            .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                            .overlay(
-                                                Rectangle()
-                                                    .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                            )
+                        HStack(spacing: 8) {
+                            ForEach(ThemeManager.presetSwatches, id: \.hex) { swatch in
+                                let isSelected = theme.accentHex.uppercased() == swatch.hex.uppercased()
+                                Button {
+                                    withAnimation(.snappy(duration: 0.18)) {
+                                        theme.accentHex = swatch.hex
+                                        customHexInput = swatch.hex
                                     }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-
-                    dividerLine
-
-                    // Mux TCP Multiplexing
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.mux"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.enableMux },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.enableMux = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
-
-                    dividerLine
-
-                    // TCP Fast Open (TFO)
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.tfo"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.enableTCPFastOpen },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.enableTCPFastOpen = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
-
-                    dividerLine
-
-                    // Connect On Demand
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.ondemand"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.connectOnDemand },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.connectOnDemand = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
-
-                    dividerLine
-
-                    // Disconnect On Sleep
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.disconnectsleep"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.disconnectOnSleep },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.disconnectOnSleep = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
-
-                    dividerLine
-
-                    // Allow Insecure TLS Certificates
-                    NothingMechanicalSwitch(
-                        label: localization.tr("connection.allowinsecure"),
-                        isOn: Binding(
-                            get: { vpnManager.connectionSettings.allowInsecureByDefault },
-                            set: { newValue in
-                                var updated = vpnManager.connectionSettings
-                                updated.allowInsecureByDefault = newValue
-                                vpnManager.updateConnectionSettings(updated)
-                            }
-                        )
-                    )
-
-                    dividerLine
-
-                    // TUN MTU Selector (1280 / 1360 / 1400 / 1500)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("connection.mtu"))
-
-                        HStack(spacing: 6) {
-                            ForEach(HappConnectionSettings.availableMTUs, id: \.self) { mtu in
-                                let isSelected = vpnManager.connectionSettings.tunMTU == mtu
-                                Button {
-                                    var updated = vpnManager.connectionSettings
-                                    updated.tunMTU = mtu
-                                    vpnManager.updateConnectionSettings(updated)
                                 } label: {
-                                    Text("\(mtu)")
-                                        .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 32)
-                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                        )
+                                    VStack(spacing: 5) {
+                                        Circle()
+                                            .fill(swatch.color)
+                                            .frame(width: 20, height: 20)
+                                            .overlay(
+                                                Circle()
+                                                    .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: isSelected ? 2 : 1)
+                                            )
+
+                                        Rectangle()
+                                            .fill(isSelected ? swatch.color : Color.clear)
+                                            .frame(height: 2)
+                                    }
+                                    .padding(.top, 6)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 42)
+                                    .background(isSelected ? NothingPalette.surfaceElevated : NothingPalette.trueBlack)
+                                    .overlay(
+                                        Rectangle()
+                                            .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
-                    }
 
-                    // Xray Domain Strategy (IPIfNonMatch / AsIs / IPOnDemand)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("connection.domainstrategy"))
+                        // Custom HEX Input & Live Swatch
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(theme.accentColor)
+                                .frame(width: 18, height: 18)
 
-                        HStack(spacing: 6) {
-                            ForEach(XrayDomainStrategy.allCases, id: \.rawValue) { strategy in
-                                let isSelected = vpnManager.connectionSettings.domainStrategy == strategy
-                                Button {
-                                    var updated = vpnManager.connectionSettings
-                                    updated.domainStrategy = strategy
-                                    vpnManager.updateConnectionSettings(updated)
-                                } label: {
-                                    Text(strategy.rawValue.uppercased())
-                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 32)
-                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    // Core Log Level (none / error / warning / info / debug)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("connection.loglevel"))
-
-                        HStack(spacing: 6) {
-                            ForEach(XrayLogLevel.allCases, id: \.rawValue) { level in
-                                let isSelected = vpnManager.connectionSettings.logLevel == level
-                                Button {
-                                    var updated = vpnManager.connectionSettings
-                                    updated.logLevel = level
-                                    vpnManager.updateConnectionSettings(updated)
-                                } label: {
-                                    Text(level.rawValue.uppercased())
-                                        .font(NothingTypography.technicalMono(size: 9, weight: .bold))
-                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 30)
-                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    dividerLine
-
-                    // Live Generated Xray-Core JSON Inspector (Happ Config Viewer)
-                    Button {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            showCoreJSONPreview.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Text(localization.tr("connection.corejson.preview"))
+                            TextField("#D71921", text: $customHexInput)
                                 .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                                .foregroundStyle(NothingPalette.accentRed)
-
-                            Spacer()
-
-                            Text(showCoreJSONPreview ? "[-]" : "[+]")
-                                .font(NothingTypography.technicalMono(size: 12, weight: .bold))
                                 .foregroundStyle(NothingPalette.pureWhite)
-                        }
-                    }
-                    .buttonStyle(.plain)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.characters)
+                                .padding(.horizontal, 10)
+                                .frame(height: 32)
+                                .background(NothingPalette.surfaceElevated)
+                                .overlay(
+                                    Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
 
-                    if showCoreJSONPreview {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("XRAY-CORE OUTBOUND CONFIG")
-                                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
-                                    .foregroundStyle(NothingPalette.mutedGrey)
-
-                                Spacer()
-
-                                Button {
-                                    UIPasteboard.general.string = vpnManager.activeCoreJSONPreview
-                                } label: {
-                                    Text("[COPY JSON]")
-                                        .font(NothingTypography.technicalMono(size: 9, weight: .bold))
-                                        .foregroundStyle(NothingPalette.accentRed)
+                            Button {
+                                if let valid = Color(hex: customHexInput) {
+                                    _ = valid
+                                    theme.accentHex = customHexInput.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
                                 }
-                                .buttonStyle(.plain)
-                            }
-
-                            ScrollView(.horizontal, showsIndicators: true) {
-                                Text(vpnManager.activeCoreJSONPreview)
-                                    .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                            } label: {
+                                Text("[SET]")
+                                    .font(NothingTypography.technicalMono(size: 11, weight: .bold))
                                     .foregroundStyle(NothingPalette.pureWhite)
-                                    .padding(10)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 32)
+                                    .background(theme.accentColor)
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
                             }
-                            .frame(maxHeight: 220)
-                            .background(NothingPalette.trueBlack)
-                            .overlay(
-                                Rectangle()
-                                    .strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
-                            )
+                            .buttonStyle(.plain)
                         }
+                        .padding(.top, 4)
                     }
                 }
             }
         }
     }
 
-    // MARK: - 4. Split Tunneling & Routing Rules
+    // MARK: - 2. Network & Routing Section (Global, Split LAN/RU, Direct, CIDRs, Kill Switch)
 
-    private var routingAndSplitTunnelSection: some View {
+    private var networkAndRoutingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(localization.tr("settings.routing.header"))
 
@@ -616,7 +191,76 @@ public struct SettingsView: View {
             }
 
             NothingIndustrialCard(isHighlighted: false) {
-                VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Custom CIDR Bypass List
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("settings.routing.cidrs.header"))
+
+                        HStack(spacing: 8) {
+                            TextField("192.168.1.0/24", text: $newCIDRInput)
+                                .font(NothingTypography.technicalMono(size: 11, weight: .medium))
+                                .foregroundStyle(NothingPalette.pureWhite)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .padding(.horizontal, 10)
+                                .frame(height: 32)
+                                .background(NothingPalette.surfaceElevated)
+                                .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+
+                            Button {
+                                let trimmed = newCIDRInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmed.isEmpty && !vpnManager.routingConfig.customExcludedCIDRs.contains(trimmed) {
+                                    var updated = vpnManager.routingConfig
+                                    updated.customExcludedCIDRs.append(trimmed)
+                                    vpnManager.updateRoutingConfiguration(updated)
+                                    newCIDRInput = ""
+                                }
+                            } label: {
+                                Text("[ADD]")
+                                    .font(NothingTypography.technicalMono(size: 11, weight: .bold))
+                                    .foregroundStyle(NothingPalette.pureWhite)
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 32)
+                                    .background(NothingPalette.surfaceElevated)
+                                    .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if !vpnManager.routingConfig.customExcludedCIDRs.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(vpnManager.routingConfig.customExcludedCIDRs, id: \.self) { cidr in
+                                        HStack(spacing: 4) {
+                                            Text(cidr)
+                                                .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                                .foregroundStyle(NothingPalette.pureWhite)
+
+                                            Button {
+                                                var updated = vpnManager.routingConfig
+                                                updated.customExcludedCIDRs.removeAll { $0 == cidr }
+                                                vpnManager.updateRoutingConfiguration(updated)
+                                            } label: {
+                                                Text("✕")
+                                                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                                    .foregroundStyle(NothingPalette.accentRed)
+                                            }
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(NothingPalette.surfaceElevated)
+                                        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    dividerLine
+
                     NothingMechanicalSwitch(
                         label: localization.tr("settings.killswitch"),
                         isOn: Binding(
@@ -647,7 +291,7 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 5. Custom DNS over HTTPS (DoH) Selector
+    // MARK: - 3. DNS Configuration (DoH & Presets)
 
     private var dnsResolverSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -692,7 +336,366 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 6. Subscription Groups & Auto-Update Settings
+    // MARK: - 4. Latency & Diagnostics Settings
+
+    private var pingDiagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(localization.tr("settings.ping.header"))
+
+            NothingIndustrialCard(isHighlighted: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Ping Type: TCP / VIA PROXY (HTTP 204) / ICMP
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("ping.method.header"))
+
+                        HStack(spacing: 8) {
+                            ForEach(PingMeasurementMethod.allCases, id: \.rawValue) { method in
+                                let isSelected = vpnManager.pingSettings.method == method
+                                Button {
+                                    var updated = vpnManager.pingSettings
+                                    updated.method = method
+                                    vpnManager.updatePingSettings(updated)
+                                } label: {
+                                    Text(localization.tr(method.localizationKey))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 36)
+                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Ping Test URL (HTTP 204 Endpoint)
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("ping.url.header"))
+
+                        VStack(spacing: 6) {
+                            ForEach(PingTestURLPreset.allCases, id: \.rawValue) { preset in
+                                let isSelected = vpnManager.pingSettings.testURLPreset == preset
+                                Button {
+                                    var updated = vpnManager.pingSettings
+                                    updated.testURLPreset = preset
+                                    vpnManager.updatePingSettings(updated)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Rectangle()
+                                            .fill(isSelected ? NothingPalette.accentRed : NothingPalette.dimMatrixDot)
+                                            .frame(width: 7, height: 7)
+
+                                        Text(preset.displayName)
+                                            .font(NothingTypography.technicalMono(size: 10, weight: isSelected ? .bold : .regular))
+                                            .foregroundStyle(isSelected ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
+                                            .lineLimit(1)
+
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 32)
+                                    .background(isSelected ? NothingPalette.surfaceElevated : NothingPalette.trueBlack)
+                                    .overlay(
+                                        Rectangle()
+                                            .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Timeout Selector
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("ping.timeout.header"))
+
+                        HStack(spacing: 6) {
+                            ForEach(HappPingSettings.availableTimeouts, id: \.self) { timeout in
+                                let isSelected = abs(vpnManager.pingSettings.timeoutSeconds - timeout) < 0.05
+                                Button {
+                                    var updated = vpnManager.pingSettings
+                                    updated.timeoutSeconds = timeout
+                                    vpnManager.updatePingSettings(updated)
+                                } label: {
+                                    Text(String(format: "%.1fS", timeout))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 32)
+                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // Display Format
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("ping.display.header"))
+
+                        HStack(spacing: 8) {
+                            ForEach(PingResultDisplayMode.allCases, id: \.rawValue) { mode in
+                                let isSelected = vpnManager.pingSettings.displayMode == mode
+                                Button {
+                                    var updated = vpnManager.pingSettings
+                                    updated.displayMode = mode
+                                    vpnManager.updatePingSettings(updated)
+                                } label: {
+                                    Text(localization.tr(mode.localizationKey))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 34)
+                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    dividerLine
+
+                    NothingMechanicalSwitch(
+                        label: localization.tr("ping.sort"),
+                        isOn: Binding(
+                            get: { vpnManager.pingSettings.sortNodesByLatency },
+                            set: { newValue in
+                                var updated = vpnManager.pingSettings
+                                updated.sortNodesByLatency = newValue
+                                vpnManager.updatePingSettings(updated)
+                            }
+                        )
+                    )
+
+                    dividerLine
+
+                    NothingMechanicalSwitch(
+                        label: localization.tr("ping.autostart"),
+                        isOn: Binding(
+                            get: { vpnManager.pingSettings.autoPingOnStartup },
+                            set: { newValue in
+                                var updated = vpnManager.pingSettings
+                                updated.autoPingOnStartup = newValue
+                                vpnManager.updatePingSettings(updated)
+                            }
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - 5. Connection, DPI Bypass & Xray Core Settings
+
+    private var connectionAndCoreSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(localization.tr("settings.connection.header"))
+
+            NothingIndustrialCard(isHighlighted: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Tunnel Mode (TUN vs Proxy-Only)
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("connection.mode"))
+
+                        HStack(spacing: 8) {
+                            ForEach(TunnelExecutionMode.allCases, id: \.rawValue) { mode in
+                                let isSelected = vpnManager.connectionSettings.tunnelMode == mode
+                                Button {
+                                    var updated = vpnManager.connectionSettings
+                                    updated.tunnelMode = mode
+                                    vpnManager.updateConnectionSettings(updated)
+                                } label: {
+                                    Text(localization.tr(mode.localizationKey))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 34)
+                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    dividerLine
+
+                    // TLS Fragmentation (DPI Bypass)
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("connection.tlsfragment"))
+
+                        HStack(spacing: 6) {
+                            ForEach(TLSFragmentPreset.allCases, id: \.rawValue) { preset in
+                                let isSelected = vpnManager.connectionSettings.enableTLSFragment && vpnManager.connectionSettings.tlsFragmentPreset == preset
+                                Button {
+                                    var updated = vpnManager.connectionSettings
+                                    if preset == .off {
+                                        updated.enableTLSFragment = false
+                                    } else {
+                                        updated.enableTLSFragment = true
+                                        updated.tlsFragmentPreset = preset
+                                    }
+                                    vpnManager.updateConnectionSettings(updated)
+                                } label: {
+                                    Text(preset.displayName)
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 32)
+                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    dividerLine
+
+                    // Mux TCP Multiplexing
+                    NothingMechanicalSwitch(
+                        label: localization.tr("connection.mux"),
+                        isOn: Binding(
+                            get: { vpnManager.connectionSettings.enableMux },
+                            set: { newValue in
+                                var updated = vpnManager.connectionSettings
+                                updated.enableMux = newValue
+                                vpnManager.updateConnectionSettings(updated)
+                            }
+                        )
+                    )
+
+                    dividerLine
+
+                    // TCP Fast Open
+                    NothingMechanicalSwitch(
+                        label: localization.tr("connection.tfo"),
+                        isOn: Binding(
+                            get: { vpnManager.connectionSettings.enableTCPFastOpen },
+                            set: { newValue in
+                                var updated = vpnManager.connectionSettings
+                                updated.enableTCPFastOpen = newValue
+                                vpnManager.updateConnectionSettings(updated)
+                            }
+                        )
+                    )
+
+                    dividerLine
+
+                    // TUN MTU Selector
+                    VStack(alignment: .leading, spacing: 8) {
+                        subLabel(localization.tr("connection.mtu"))
+
+                        HStack(spacing: 6) {
+                            ForEach(HappConnectionSettings.availableMTUs, id: \.self) { mtu in
+                                let isSelected = vpnManager.connectionSettings.tunMTU == mtu
+                                Button {
+                                    var updated = vpnManager.connectionSettings
+                                    updated.tunMTU = mtu
+                                    vpnManager.updateConnectionSettings(updated)
+                                } label: {
+                                    Text("\(mtu)")
+                                        .font(NothingTypography.technicalMono(size: 11, weight: .bold))
+                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 32)
+                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                                        .overlay(
+                                            Rectangle()
+                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    dividerLine
+
+                    // JSON Inspector Button
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            showCoreJSONPreview.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Text(localization.tr("connection.corejson.preview"))
+                                .font(NothingTypography.technicalMono(size: 11, weight: .bold))
+                                .foregroundStyle(NothingPalette.accentRed)
+
+                            Spacer()
+
+                            Text(showCoreJSONPreview ? "[-]" : "[+]")
+                                .font(NothingTypography.technicalMono(size: 12, weight: .bold))
+                                .foregroundStyle(NothingPalette.pureWhite)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if showCoreJSONPreview {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("XRAY-CORE OUTBOUND CONFIG")
+                                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                    .foregroundStyle(NothingPalette.mutedGrey)
+
+                                Spacer()
+
+                                Button {
+                                    UIPasteboard.general.string = vpnManager.activeCoreJSONPreview
+                                } label: {
+                                    Text("[COPY JSON]")
+                                        .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                        .foregroundStyle(NothingPalette.accentRed)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            ScrollView(.horizontal, showsIndicators: true) {
+                                Text(vpnManager.activeCoreJSONPreview)
+                                    .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                                    .foregroundStyle(NothingPalette.pureWhite)
+                                    .padding(10)
+                            }
+                            .frame(maxHeight: 200)
+                            .background(NothingPalette.trueBlack)
+                            .overlay(
+                                Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 6. Subscriptions Management
 
     private var subscriptionGroupsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -742,41 +745,6 @@ public struct SettingsView: View {
                             }
                         )
                     )
-
-                    dividerLine
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("subscription.useragent"))
-
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.flexible(), spacing: 6),
-                                GridItem(.flexible(), spacing: 6)
-                            ],
-                            spacing: 6
-                        ) {
-                            ForEach(SubscriptionUserAgentProfile.allCases, id: \.rawValue) { profile in
-                                let isSelected = vpnManager.subscriptionSettings.userAgentProfile == profile
-                                Button {
-                                    var updated = vpnManager.subscriptionSettings
-                                    updated.userAgentProfile = profile
-                                    vpnManager.updateSubscriptionSettings(updated)
-                                } label: {
-                                    Text(profile.shortLabel)
-                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                                        .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 32)
-                                        .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
-                                        .overlay(
-                                            Rectangle()
-                                                .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
                 }
             }
 
@@ -819,7 +787,150 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 7. Dot-Matrix Build Version Indicator (v0.1.0)
+    // MARK: - 7. Support Authors Section (Поддержка авторов)
+
+    private var supportAuthorsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(localization.tr("settings.support.header"))
+
+            // Card 1: scrt (Idea Author)
+            Link(destination: URL(string: "https://pay.cloudtips.ru/p/feaf1b8f")!) {
+                NothingIndustrialCard(isHighlighted: false) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Rectangle()
+                                .fill(NothingPalette.surfaceElevated)
+                                .frame(width: 42, height: 42)
+                                .overlay(
+                                    Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
+                                )
+
+                            Text("💡")
+                                .font(.system(size: 18))
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text("scrt")
+                                    .font(NothingTypography.technicalMono(size: 14, weight: .bold))
+                                    .foregroundStyle(NothingPalette.pureWhite)
+
+                                Text("IDEA // CONCEPT")
+                                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .foregroundStyle(NothingPalette.trueBlack)
+                                    .background(NothingPalette.pureWhite)
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                            }
+
+                            Text(localization.tr("settings.support.scrt_role"))
+                                .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                                .foregroundStyle(NothingPalette.mutedGrey)
+                        }
+
+                        Spacer()
+
+                        Text("↗")
+                            .font(NothingTypography.technicalMono(size: 18, weight: .bold))
+                            .foregroundStyle(NothingPalette.accentRed)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            // Card 2: Vitya#kolbaska (App Developer)
+            Link(destination: URL(string: "https://pay.cloudtips.ru/p/450b8509")!) {
+                NothingIndustrialCard(isHighlighted: false) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Rectangle()
+                                .fill(NothingPalette.surfaceElevated)
+                                .frame(width: 42, height: 42)
+                                .overlay(
+                                    Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
+                                )
+
+                            Text("⚡")
+                                .font(.system(size: 18))
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text("Vitya#kolbaska")
+                                    .font(NothingTypography.technicalMono(size: 14, weight: .bold))
+                                    .foregroundStyle(NothingPalette.pureWhite)
+
+                                Text("DEV // CODE")
+                                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .foregroundStyle(NothingPalette.trueBlack)
+                                    .background(NothingPalette.accentRed)
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                            }
+
+                            Text(localization.tr("settings.support.vitya_role"))
+                                .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                                .foregroundStyle(NothingPalette.mutedGrey)
+                        }
+
+                        Spacer()
+
+                        Text("↗")
+                            .font(NothingTypography.technicalMono(size: 18, weight: .bold))
+                            .foregroundStyle(NothingPalette.accentRed)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - 8. Instant Language Switcher (SYSTEM / РУССКИЙ / ENGLISH)
+
+    private var languageSwitcherSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(localization.tr("settings.language.header"))
+
+            NothingIndustrialCard(isHighlighted: false) {
+                HStack(spacing: 8) {
+                    ForEach(AppLanguageOption.allCases) { option in
+                        let isSelected = localization.selectedOption == option
+                        Button {
+                            withAnimation(.snappy(duration: 0.16)) {
+                                localization.selectedOption = option
+                            }
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text(localization.tr(option.titleKey))
+                                    .font(NothingTypography.technicalMono(size: 11, weight: .bold))
+                                    .foregroundStyle(isSelected ? NothingPalette.trueBlack : NothingPalette.pureWhite)
+                                    .tracking(1.1)
+
+                                Rectangle()
+                                    .fill(isSelected ? NothingPalette.accentRed : Color.clear)
+                                    .frame(width: 14, height: 2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(isSelected ? NothingPalette.pureWhite : NothingPalette.surfaceElevated)
+                            .overlay(
+                                Rectangle()
+                                    .strokeBorder(isSelected ? NothingPalette.pureWhite : NothingPalette.gridStroke, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 9. Dot-Matrix Build Version Indicator (v0.2.0)
 
     private var versionFooterBadge: some View {
         VStack(spacing: 10) {
@@ -838,7 +949,7 @@ public struct SettingsView: View {
 
                 Spacer()
 
-                Text("BUILD \(Self.buildNumber) // IOS 26.0 // XRAY-TUN")
+                Text("BUILD \(Self.buildNumber) // XRAY-TUN // SWIFT 6")
                     .font(NothingTypography.technicalMono(size: 10, weight: .medium))
                     .foregroundStyle(NothingPalette.mutedGrey)
                     .tracking(1.2)

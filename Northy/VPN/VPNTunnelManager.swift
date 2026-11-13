@@ -3,7 +3,7 @@ import Foundation
 import Observation
 import UIKit
 
-// MARK: - Happ-Inspired Tunnel, Ping & Subscription Controller (iOS 26+)
+// MARK: - Happ-Inspired Tunnel, Ping & Subscription Controller
 
 @Observable
 @MainActor
@@ -416,10 +416,8 @@ public final class VPNTunnelManager {
             "tunMTU": connectionSettings.tunMTU
         ]
         proto.disconnectOnSleep = connectionSettings.disconnectOnSleep
-        if #available(iOS 26.0, *) {
-            proto.includeAllNetworks = routingConfig.strictKillSwitch && connectionSettings.tunnelMode == .tun
-            proto.excludeLocalNetworks = routingConfig.bypassLocalNetwork
-        }
+        proto.includeAllNetworks = routingConfig.strictKillSwitch && connectionSettings.tunnelMode == .tun
+        proto.excludeLocalNetworks = routingConfig.bypassLocalNetwork
 
         manager.protocolConfiguration = proto
         manager.localizedDescription = "NOTHING // VPN (\(node.remark))"
@@ -467,6 +465,7 @@ public final class VPNTunnelManager {
                     self.txSpeedBytesPerSec = 0
                     self.lastRxBytes = 0
                     self.lastTxBytes = 0
+                    SharedTunnelStore.shared.clearActiveTelemetry()
                 }
             }
         }
@@ -477,6 +476,13 @@ public final class VPNTunnelManager {
         telemetryTimerTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
+
+                // 1. App Group snapshot check (instant, reliable fallback)
+                if let sharedTelemetry = SharedTunnelStore.shared.readActiveTelemetry() {
+                    self.processIncomingTelemetry(sharedTelemetry)
+                }
+
+                // 2. Direct session IPC query
                 if let session = self.providerManager?.connection as? NETunnelProviderSession {
                     let msg = Data(TunnelIPCCommand.queryTelemetry.rawValue.utf8)
                     try? session.sendProviderMessage(msg) { responseData in
@@ -485,21 +491,31 @@ public final class VPNTunnelManager {
                             return
                         }
                         Task { @MainActor in
-                            let deltaRx = decoded.rxBytes >= self.lastRxBytes ? (decoded.rxBytes - self.lastRxBytes) : decoded.rxBytes
-                            let deltaTx = decoded.txBytes >= self.lastTxBytes ? (decoded.txBytes - self.lastTxBytes) : decoded.txBytes
-                            self.rxSpeedBytesPerSec = deltaRx
-                            self.txSpeedBytesPerSec = deltaTx
-                            self.lastRxBytes = decoded.rxBytes
-                            self.lastTxBytes = decoded.txBytes
-                            self.telemetry = decoded
-                            if let remoteDate = decoded.connectedSince, self.connectedSince == nil {
-                                self.connectedSince = remoteDate
-                            }
+                            self.processIncomingTelemetry(decoded)
                         }
                     }
                 }
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+    }
+
+    private func processIncomingTelemetry(_ decoded: TunnelRuntimeTelemetry) {
+        guard connectionStatus == .connected else { return }
+        let currentRx = max(decoded.rxBytes, telemetry.rxBytes)
+        let currentTx = max(decoded.txBytes, telemetry.txBytes)
+
+        let deltaRx = currentRx >= lastRxBytes ? (currentRx - lastRxBytes) : 0
+        let deltaTx = currentTx >= lastTxBytes ? (currentTx - lastTxBytes) : 0
+
+        rxSpeedBytesPerSec = deltaRx
+        txSpeedBytesPerSec = deltaTx
+        lastRxBytes = currentRx
+        lastTxBytes = currentTx
+        telemetry = decoded
+
+        if let remoteDate = decoded.connectedSince, connectedSince == nil {
+            connectedSince = remoteDate
         }
     }
 

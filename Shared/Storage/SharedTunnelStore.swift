@@ -40,6 +40,7 @@ public final class SharedTunnelStore: Sendable {
         static let subscriptionSettings = "nothing.vpn.subscription_settings.v1"
         static let activeXrayConfigJSON = "nothing.vpn.active_xray_json.v1"
         static let languageOverride = "nothing.vpn.language_override.v1"
+        static let activeTelemetry = "nothing.vpn.active_telemetry.v1"
     }
 
     public static let shared = SharedTunnelStore()
@@ -176,6 +177,46 @@ public final class SharedTunnelStore: Sendable {
         defaults.set(code, forKey: Keys.languageOverride)
     }
 
+    // MARK: - Real-Time Tunnel Telemetry Handoff (IPC & App Group Bridge)
+
+    public func writeActiveTelemetry(_ telemetry: TunnelRuntimeTelemetry) {
+        if let data = try? JSONEncoder().encode(telemetry) {
+            defaults.set(data, forKey: Keys.activeTelemetry)
+        }
+    }
+
+    public func readActiveTelemetry() -> TunnelRuntimeTelemetry? {
+        guard let data = defaults.data(forKey: Keys.activeTelemetry),
+              let telemetry = try? JSONDecoder().decode(TunnelRuntimeTelemetry.self, from: data) else {
+            return nil
+        }
+        return telemetry
+    }
+
+    public func clearActiveTelemetry() {
+        defaults.removeObject(forKey: Keys.activeTelemetry)
+    }
+
+    // MARK: - IP & DNS Resolution Helpers
+
+    public static func resolveIPv4(host: String) -> String? {
+        var hints = addrinfo()
+        hints.ai_family = AF_INET
+        hints.ai_socktype = SOCK_STREAM
+        var res: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &res) == 0, let first = res else {
+            return nil
+        }
+        defer { freeaddrinfo(res) }
+        var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+        let sockaddrIn = first.pointee.ai_addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee }
+        var addr = sockaddrIn.sin_addr
+        guard inet_ntop(AF_INET, &addr, &buffer, socklen_t(INET_ADDRSTRLEN)) != nil else {
+            return nil
+        }
+        return String(cString: buffer)
+    }
+
     // MARK: - Default Industrial Seed Nodes (Reachable Anycast Edge Hosts for Live Ping Testing)
 
     public static let defaultBootstrapNodes: [ProxyNode] = [
@@ -263,7 +304,7 @@ public enum TCPNodePinger {
         }
     }
 
-    /// Measures TCP SYN/ACK handshake RTT via `NWConnection` (iOS 26 Network.framework).
+    /// Measures TCP SYN/ACK handshake RTT via `NWConnection` (Network.framework).
     public static func measureLatency(
         host: String,
         port: Int,

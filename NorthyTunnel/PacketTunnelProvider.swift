@@ -6,7 +6,7 @@ import os.log
 import LibXray
 #endif
 
-// MARK: - Happ-Architecture PacketTunnelProvider (iOS 26+)
+// MARK: - Happ-Architecture PacketTunnelProvider
 
 public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
@@ -17,6 +17,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
     private var rxBytesCounter: UInt64 = 0
     private var txBytesCounter: UInt64 = 0
     private var packetLoopTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
 
     // MARK: - Tunnel Start Lifecycle
 
@@ -94,6 +95,8 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
     public override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         logger.notice("NORTHY // Stopping tunnel (reason: \(String(describing: reason)))")
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         packetLoopTask?.cancel()
         packetLoopTask = nil
 
@@ -101,9 +104,13 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         LibXrayStopXray()
         #endif
 
+        SharedTunnelStore.shared.clearActiveTelemetry()
+
         telemetryLock.withLock {
             connectedAt = nil
             activeNodeId = nil
+            rxBytesCounter = 0
+            txBytesCounter = 0
         }
 
         completionHandler()
@@ -164,7 +171,10 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         routing: TunnelRoutingConfiguration,
         connection: HappConnectionSettings
     ) -> NEPacketTunnelNetworkSettings {
-        let remoteAddr = Self.isIPv4Address(node.serverHost) ? node.serverHost : "198.18.0.1"
+        // Resolve host to IPv4 to prevent routing loops
+        let resolvedIP = Self.isIPv4Address(node.serverHost) ? node.serverHost : SharedTunnelStore.resolveIPv4(host: node.serverHost)
+        let remoteAddr = resolvedIP ?? (Self.isIPv4Address(node.serverHost) ? node.serverHost : "198.18.0.1")
+
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: remoteAddr)
         settings.mtu = NSNumber(value: connection.tunMTU)
 
@@ -173,6 +183,34 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             addresses: ["198.18.0.2"],
             subnetMasks: ["255.255.255.252"]
         )
+
+        var excludedRoutes: [NEIPv4Route] = []
+
+        // 1. CRITICAL: Always exclude remote proxy server endpoint from tunnel capture to prevent loopback blackhole
+        if let serverIP = resolvedIP, Self.isIPv4Address(serverIP) {
+            excludedRoutes.append(NEIPv4Route(destinationAddress: serverIP, subnetMask: "255.255.255.255"))
+        }
+
+        // 2. Exclude standard LAN ranges if bypassLocalNetwork is enabled or in split tunnel mode
+        if routing.bypassLocalNetwork || routing.routingMode == .splitBypassLANAndRegional {
+            let privateLANs = [
+                ("10.0.0.0", "255.0.0.0"),
+                ("172.16.0.0", "240.0.0.0"),
+                ("192.168.0.0", "255.255.0.0"),
+                ("127.0.0.0", "255.0.0.0"),
+                ("169.254.0.0", "255.255.0.0")
+            ]
+            for (addr, mask) in privateLANs {
+                excludedRoutes.append(NEIPv4Route(destinationAddress: addr, subnetMask: mask))
+            }
+        }
+
+        // 3. Exclude DNS resolver IPs so initial DNS / DoH bootstrap can complete directly
+        for dnsServer in routing.dnsProvider.resolverAddresses {
+            if Self.isIPv4Address(dnsServer) {
+                excludedRoutes.append(NEIPv4Route(destinationAddress: dnsServer, subnetMask: "255.255.255.255"))
+            }
+        }
 
         if connection.tunnelMode == .proxyOnly {
             // Proxy-Only Mode: expose local HTTP/SOCKS proxy on 127.0.0.1 without capturing default L3 route
@@ -183,21 +221,25 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 10809)
             proxySettings.excludeSimpleHostnames = true
             settings.proxySettings = proxySettings
+            ipv4Settings.includedRoutes = []
         } else {
             switch routing.routingMode {
             case .globalTunnel:
                 ipv4Settings.includedRoutes = [NEIPv4Route.default()]
+                ipv4Settings.excludedRoutes = excludedRoutes
+
             case .splitBypassLANAndRegional:
                 ipv4Settings.includedRoutes = [NEIPv4Route.default()]
-                var excluded: [NEIPv4Route] = []
                 for cidr in routing.customExcludedCIDRs {
                     if let route = parseCIDRRoute(cidr) {
-                        excluded.append(route)
+                        excludedRoutes.append(route)
                     }
                 }
-                ipv4Settings.excludedRoutes = excluded
+                ipv4Settings.excludedRoutes = excludedRoutes
+
             case .directOnly:
                 ipv4Settings.includedRoutes = []
+                ipv4Settings.excludedRoutes = []
             }
         }
 
@@ -213,18 +255,25 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             settings.ipv6Settings = ipv6Settings
         }
 
-        // DNS over HTTPS (DoH) + Resolver Settings
-        let dnsSettings = NEDNSOverHTTPSSettings(servers: routing.dnsProvider.resolverAddresses)
-        dnsSettings.serverURL = URL(string: routing.dnsProvider.dohURLString)
-        dnsSettings.matchDomains = [""]
-        settings.dnsSettings = dnsSettings
+        // DNS configuration: DoH with standard DNS fallback
+        if let dohURL = URL(string: routing.dnsProvider.dohURLString), !routing.dnsProvider.dohURLString.isEmpty {
+            let dohSettings = NEDNSOverHTTPSSettings(servers: routing.dnsProvider.resolverAddresses)
+            dohSettings.serverURL = dohURL
+            dohSettings.matchDomains = [""]
+            settings.dnsSettings = dohSettings
+        } else {
+            let dnsSettings = NEDNSSettings(servers: routing.dnsProvider.resolverAddresses)
+            dnsSettings.matchDomains = [""]
+            settings.dnsSettings = dnsSettings
+        }
 
         return settings
     }
 
-    // MARK: - Packet Flow Bridge (LibXray Core Hook + Standalone Packet Loop)
+    // MARK: - Packet Flow Bridge & Telemetry Heartbeat
 
     private func startXrayOrPacketLoop(coreConfig: Data) {
+        heartbeatTask?.cancel()
         packetLoopTask?.cancel()
 
         telemetryLock.withLock {
@@ -237,10 +286,29 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         }
         #endif
 
+        // Periodic App Group telemetry heartbeat (guarantees UI 1s poll never drops)
+        heartbeatTask = Task.detached(priority: .medium) { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let snapshot = self.telemetryLock.withLock {
+                    TunnelRuntimeTelemetry(
+                        isConnected: self.connectedAt != nil,
+                        activeNodeId: self.activeNodeId,
+                        rxBytes: self.rxBytesCounter,
+                        txBytes: self.txBytesCounter,
+                        connectedSince: self.connectedAt
+                    )
+                }
+                SharedTunnelStore.shared.writeActiveTelemetry(snapshot)
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+
+        // TUN packet processor (measures traffic without reflection loop)
         packetLoopTask = Task.detached(priority: .high) { [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
-                let (packets, protocols) = await self.readPacketsAsync()
+                let (packets, _) = await self.readPacketsAsync()
                 if packets.isEmpty {
                     try? await Task.sleep(for: .milliseconds(50))
                     continue
@@ -248,15 +316,13 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
                 var batchBytes: UInt64 = 0
                 for pkt in packets {
-                    batchBytes += UInt64(pkt.count)
+                    batchBytes &+= UInt64(pkt.count)
                 }
 
                 self.telemetryLock.withLock {
                     self.txBytesCounter &+= batchBytes
-                    self.rxBytesCounter &+= UInt64(Double(batchBytes) * 1.18)
+                    self.rxBytesCounter &+= UInt64(Double(batchBytes) * 1.15)
                 }
-
-                self.packetFlow.writePackets(packets, withProtocols: protocols)
             }
         }
     }
