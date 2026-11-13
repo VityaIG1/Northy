@@ -317,6 +317,14 @@ public enum TLSFragmentPreset: String, Codable, CaseIterable, Sendable {
     public var label: String {
         "LEN \(rawValue)B // INT \(intervalRange)MS"
     }
+
+    public var displayName: String {
+        switch self {
+        case .aggressive: return "AGGRESSIVE"
+        case .balanced: return "BALANCED"
+        case .subtle: return "SUBTLE"
+        }
+    }
 }
 
 public struct HappConnectionSettings: Codable, Hashable, Sendable {

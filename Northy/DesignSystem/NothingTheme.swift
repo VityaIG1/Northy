@@ -102,6 +102,7 @@ extension Color {
 
 // MARK: - Nothing OS Industrial Design Tokens
 
+@MainActor
 public enum NothingPalette {
     /// Deep OLED Black (`#000000`)
     public static let trueBlack = Color(red: 0.0, green: 0.0, blue: 0.0)
@@ -127,6 +128,7 @@ public enum NothingPalette {
 
 // MARK: - Nothing OS Typography Modifiers
 
+@MainActor
 public enum NothingTypography {
     public static func dotMatrixDisplay(size: CGFloat) -> Font {
         .system(size: size, weight: .black, design: .monospaced)

@@ -544,20 +544,25 @@ public struct SettingsView: View {
                     dividerLine
 
                     // TLS Fragmentation (DPI Bypass)
-                    VStack(alignment: .leading, spacing: 8) {
-                        subLabel(localization.tr("connection.tlsfragment"))
+                    NothingMechanicalSwitch(
+                        label: localization.tr("connection.tlsfragment"),
+                        isOn: Binding(
+                            get: { vpnManager.connectionSettings.enableTLSFragment },
+                            set: { val in
+                                var updated = vpnManager.connectionSettings
+                                updated.enableTLSFragment = val
+                                vpnManager.updateConnectionSettings(updated)
+                            }
+                        )
+                    )
 
+                    if vpnManager.connectionSettings.enableTLSFragment {
                         HStack(spacing: 6) {
                             ForEach(TLSFragmentPreset.allCases, id: \.rawValue) { preset in
-                                let isSelected = vpnManager.connectionSettings.enableTLSFragment && vpnManager.connectionSettings.tlsFragmentPreset == preset
+                                let isSelected = vpnManager.connectionSettings.tlsFragmentPreset == preset
                                 Button {
                                     var updated = vpnManager.connectionSettings
-                                    if preset == .off {
-                                        updated.enableTLSFragment = false
-                                    } else {
-                                        updated.enableTLSFragment = true
-                                        updated.tlsFragmentPreset = preset
-                                    }
+                                    updated.tlsFragmentPreset = preset
                                     vpnManager.updateConnectionSettings(updated)
                                 } label: {
                                     Text(preset.displayName)
