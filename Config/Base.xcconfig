@@ -1,0 +1,28 @@
+//
+// Base.xcconfig
+// NothingVPN
+//
+// Target OS: iOS 26.0+
+// Swift Language Version: 6.0
+//
+
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+IPHONEOS_DEPLOYMENT_TARGET = 26.0
+SWIFT_VERSION = 6.0
+TARGETED_DEVICE_FAMILY = 1,2
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+STRING_CATALOG_GENERATE_SYMBOLS = YES
+
+// ============================================================
+// SIGNING & IDENTIFIERS CONFIGURATION
+// ============================================================
+DEVELOPMENT_TEAM = NORTHVPN99
+ORGANIZATION_IDENTIFIER = com.scrt
+
+MAIN_BUNDLE_IDENTIFIER = com.scrt.north
+TUNNEL_BUNDLE_IDENTIFIER = com.scrt.north.PacketTunnel
+APP_GROUP_IDENTIFIER = group.com.scrt.north
+
+INFOPLIST_KEY_CFBundleDisplayName = North VPN

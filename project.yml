@@ -1,0 +1,63 @@
+name: NothingVPN
+options:
+  bundleIdPrefix: com.scrt
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: NORTHVPN99
+
+targets:
+  NothingVPN:
+    type: application
+    platform: iOS
+    sources:
+      - path: NothingVPN
+        excludes:
+          - "*.entitlements"
+      - path: Shared
+    dependencies:
+      - target: NothingVPNTunnel
+        embed: true
+    entitlements:
+      path: NothingVPN/NothingVPN.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.scrt.north
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
+        STRING_CATALOG_GENERATE_SYMBOLS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+
+  NothingVPNTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: NothingVPNTunnel
+        excludes:
+          - "Info.plist"
+          - "*.entitlements"
+      - path: Shared
+    info:
+      path: NothingVPNTunnel/Info.plist
+    entitlements:
+      path: NothingVPNTunnel/NothingVPNTunnel.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.scrt.north.PacketTunnel
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/Frameworks"
+          - "@executable_path/../../Frameworks"

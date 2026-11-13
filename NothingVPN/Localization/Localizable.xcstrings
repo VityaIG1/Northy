@@ -1,0 +1,475 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "action.connect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ENGAGE TUNNEL" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВКЛЮЧИТЬ VPN" } }
+      }
+    },
+    "action.disconnect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TERMINATE LINK" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ОТКЛЮЧИТЬ VPN" } }
+      }
+    },
+    "app.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "NOTHING // VPN" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "NOTHING // VPN" } }
+      }
+    },
+    "connection.allowinsecure" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ALLOW INSECURE TLS CERTIFICATES" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "РАЗРЕШИТЬ НЕВАЛИДНЫЕ TLS СЕРТИФИКАТЫ" } }
+      }
+    },
+    "connection.corejson.preview" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "INSPECT GENERATED XRAY-CORE JSON" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПРОСМОТР СГЕНЕРИРОВАННОГО XRAY JSON" } }
+      }
+    },
+    "connection.disconnectsleep" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "DISCONNECT TUNNEL ON DEVICE SLEEP" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ОТКЛЮЧАТЬ ТУННЕЛЬ В РЕЖИМЕ СНА" } }
+      }
+    },
+    "connection.domainstrategy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "XRAY DOMAIN STRATEGY" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СТРАТЕГИЯ ДОМЕНОВ XRAY" } }
+      }
+    },
+    "connection.fragment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TLS HELLO FRAGMENTATION (DPI BYPASS)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ФРАГМЕНТАЦИЯ TLS HELLO (ОБХОД DPI)" } }
+      }
+    },
+    "connection.fragment.preset" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "FRAGMENT PACKET WINDOW" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПАРАМЕТРЫ ФРАГМЕНТАЦИИ ПАКЕТОВ" } }
+      }
+    },
+    "connection.loglevel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CORE LOG LEVEL" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "УРОВЕНЬ ЛОГИРОВАНИЯ ЯДРА" } }
+      }
+    },
+    "connection.mode.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TUNNEL EXECUTION MODE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "РЕЖИМ РАБОТЫ ТУННЕЛЯ" } }
+      }
+    },
+    "connection.mode.proxy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PROXY ONLY // SOCKS5+HTTP (10808)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ТОЛЬКО ПРОКСИ // SOCKS5+HTTP (10808)" } }
+      }
+    },
+    "connection.mode.tun" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TUN // SYSTEM L3 INTERFACE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "TUN // СИСТЕМНЫЙ СЕТЕВОЙ ИНТЕРФЕЙС" } }
+      }
+    },
+    "connection.mtu" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TUN INTERFACE MTU" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "РАЗМЕР ПАКЕТА MTU (TUN)" } }
+      }
+    },
+    "connection.mux" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "MUX TCP MULTIPLEXING (CONCURRENCY 8)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "MUX МУЛЬТИПЛЕКСИРОВАНИЕ (8 ПОТОКОВ)" } }
+      }
+    },
+    "connection.ondemand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CONNECT ON DEMAND (AUTO-RECONNECT)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "CONNECT ON DEMAND (АВТОПЕРЕПОДКЛЮЧЕНИЕ)" } }
+      }
+    },
+    "connection.sniff.override" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OVERRIDE DESTINATION BY SNIFFED HOST" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПОДМЕНА ЦЕЛИ ПО ДОМЕНУ SNIFFING" } }
+      }
+    },
+    "connection.sniffing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TRAFFIC SNIFFING (HTTP/TLS/QUIC)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "SNIFFING АНАЛИЗ ТРАФИКА (HTTP/TLS/QUIC)" } }
+      }
+    },
+    "connection.tfo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TCP FAST OPEN (TFO)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "TCP FAST OPEN (TFO)" } }
+      }
+    },
+    "language.english" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ENGLISH" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ENGLISH" } }
+      }
+    },
+    "language.russian" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "РУССКИЙ" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "РУССКИЙ" } }
+      }
+    },
+    "language.system" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SYSTEM" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СИСТЕМНЫЙ" } }
+      }
+    },
+    "paste.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PASTE TO CONNECT" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВСТАВИТЬ И ПОДКЛЮЧИТЬ" } }
+      }
+    },
+    "paste.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "VLESS · VMESS · TROJAN · SS · SUBSCRIPTION" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "VLESS · VMESS · TROJAN · SS · ПОДПИСКА" } }
+      }
+    },
+    "ping.autostart" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AUTO-PING ON APP LAUNCH" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "АВТО-ПИНГ ПРИ ЗАПУСКЕ ПРИЛОЖЕНИЯ" } }
+      }
+    },
+    "ping.display.bars" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SIGNAL BARS ONLY" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ТОЛЬКО ШКАЛА СИГНАЛА" } }
+      }
+    },
+    "ping.display.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "RESULT DISPLAY FORMAT" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ФОРМАТ ОТОБРАЖЕНИЯ ПИНГА" } }
+      }
+    },
+    "ping.display.ms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "MS + SIGNAL BARS" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "МС + ШКАЛА СИГНАЛА" } }
+      }
+    },
+    "ping.method.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PING TYPE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ТИП ПРОВЕРКИ ПИНГА" } }
+      }
+    },
+    "ping.method.icmp" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ICMP ECHO" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ICMP ECHO" } }
+      }
+    },
+    "ping.method.tcp" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TCP SYN" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "TCP SYN" } }
+      }
+    },
+    "ping.method.urltest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "VIA PROXY (204)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЧЕРЕЗ ПРОКСИ (204)" } }
+      }
+    },
+    "ping.sort" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SORT NODES BY LOWEST PING" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СОРТИРОВАТЬ СЕРВЕРЫ ПО МИН. ПИНГУ" } }
+      }
+    },
+    "ping.timeout.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PING TIMEOUT (SEC)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ТАЙМАУТ ПИНГА (СЕК)" } }
+      }
+    },
+    "ping.url.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PING TEST URL (HTTP 204)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "URL ПРОВЕРКИ СОЕДИНЕНИЯ (HTTP 204)" } }
+      }
+    },
+    "routing.mode.direct" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "DIRECT DIAGNOSTIC" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПРЯМОЕ СОЕДИНЕНИЕ" } }
+      }
+    },
+    "routing.mode.direct.desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keep DNS encryption active without proxying TCP/UDP payload" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Только защищенный DNS без проксирования трафика" } }
+      }
+    },
+    "routing.mode.global" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "GLOBAL TUNNEL" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВЕСЬ ТРАФИК" } }
+      }
+    },
+    "routing.mode.global.desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Route 100% of IPv4/IPv6 packets through active Xray core" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Направлять весь трафик устройства через защищенный туннель" } }
+      }
+    },
+    "routing.mode.split" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SPLIT TUNNEL // BYPASS LAN & REGIONAL" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "РАЗДЕЛЬНОЕ // ОБХОД LAN И RU" } }
+      }
+    },
+    "routing.mode.split.desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Direct routing for private subnets and regional (.ru/.рф) domains" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Прямой доступ для локальной сети и региональных (.ru/.рф) доменов" } }
+      }
+    },
+    "servers.ping.all" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PING MATRIX" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПРОВЕРИТЬ ПИНГ" } }
+      }
+    },
+    "servers.section.nodes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CONFIGURED NODES" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ДОБАВЛЕННЫЕ СЕРВЕРЫ" } }
+      }
+    },
+    "settings.connection.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CONNECTION & XRAY CORE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "НАСТРОЙКИ СОЕДИНЕНИЯ И ЯДРА XRAY" } }
+      }
+    },
+    "settings.dns.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "DNS OVER HTTPS RESOLVER" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "DNS-СЕРВЕР (DOH)" } }
+      }
+    },
+    "settings.ipv6" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "IPV6 TUNNEL ROUTING" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "МАРШРУТИЗАЦИЯ IPV6" } }
+      }
+    },
+    "settings.killswitch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "STRICT KILL SWITCH (INCLUDE ALL NETWORKS)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "KILL SWITCH (БЛОКИРОВКА ТРАФИКА ВНЕ VPN)" } }
+      }
+    },
+    "settings.language.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "INTERFACE LANGUAGE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЯЗЫК ИНТЕРФЕЙСА" } }
+      }
+    },
+    "settings.ping.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PING & LATENCY DIAGNOSTICS" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "НАСТРОЙКИ ПИНГА И ЗАДЕРЖКИ" } }
+      }
+    },
+    "settings.routing.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ROUTING & SPLIT TUNNELING" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "МАРШРУТИЗАЦИЯ И ТУННЕЛИРОВАНИЕ" } }
+      }
+    },
+    "settings.subscriptions.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "NO ACTIVE SUBSCRIPTIONS // PASTE HTTPS LINK ON SERVERS TAB" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "НЕТ ПОДПИСОК // ВСТАВЬТЕ ССЫЛКУ НА ЭКРАНЕ СЕРВЕРОВ" } }
+      }
+    },
+    "settings.subscriptions.header" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SUBSCRIPTIONS & AUTO-UPDATE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПОДПИСКИ И АВТООБНОВЛЕНИЕ" } }
+      }
+    },
+    "status.connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TUNNEL ACTIVE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ТУННЕЛЬ АКТИВЕН" } }
+      }
+    },
+    "status.connecting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ESTABLISHING LINK..." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "УСТАНОВКА СВЯЗИ..." } }
+      }
+    },
+    "status.disconnected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "STANDBY // OFFLINE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ОЖИДАНИЕ // ОФЛАЙН" } }
+      }
+    },
+    "subscription.autoupdate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AUTO-UPDATE SUBSCRIPTIONS ON LAUNCH" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "АВТООБНОВЛЕНИЕ ПОДПИСОК ПРИ ВХОДЕ" } }
+      }
+    },
+    "subscription.pingafter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "AUTO-PING NODES AFTER SYNC" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "АВТО-ПИНГ ПОСЛЕ ОБНОВЛЕНИЯ ПОДПИСКИ" } }
+      }
+    },
+    "subscription.syncall" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SYNC ALL" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ОБНОВИТЬ ВСЕ" } }
+      }
+    },
+    "subscription.useragent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SUBSCRIPTION HTTP USER-AGENT" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЗАГОЛОВОК USER-AGENT ДЛЯ ПОДПИСОК" } }
+      }
+    },
+    "tab.servers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SERVERS" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СЕРВЕРЫ" } }
+      }
+    },
+    "tab.settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SETTINGS" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "НАСТРОЙКИ" } }
+      }
+    },
+    "telemetry.down" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "DOWNLOADED" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЗАГРУЖЕНО" } }
+      }
+    },
+    "telemetry.speed.down" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "DL SPEED" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СКОРОСТЬ ↓" } }
+      }
+    },
+    "telemetry.speed.up" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "UL SPEED" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СКОРОСТЬ ↑" } }
+      }
+    },
+    "telemetry.total" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "TOTAL SESSION" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВСЕГО ОБЪЕМ" } }
+      }
+    },
+    "telemetry.up" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "UPLOADED" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ОТПРАВЛЕНО" } }
+      }
+    },
+    "telemetry.uptime" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SESSION UPTIME" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВРЕМЯ СЕССИИ" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

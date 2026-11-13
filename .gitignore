@@ -1,0 +1,26 @@
+# IDE & Agent internal configs
+.antigravity/
+.gemini/
+.idea/
+.vscode/
+
+# Xcode & Apple build artifacts
+build/
+DerivedData/
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+*.xcuserdata/
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Temporary files & logs
+*.log
+*.tmp
