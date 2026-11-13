@@ -1,5 +1,5 @@
 import Foundation
-import NetworkExtension
+@preconcurrency import NetworkExtension
 import os.log
 
 #if canImport(LibXray)
@@ -21,7 +21,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
     // MARK: - Tunnel Start Lifecycle
 
     public override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        logger.notice("NOTHING_VPN // Starting NEPacketTunnelProvider session...")
+        logger.notice("NORTHY // Starting NEPacketTunnelProvider session...")
 
         let store = SharedTunnelStore.shared
         let routingConfig = store.loadRoutingConfiguration()
@@ -39,9 +39,9 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             return
         }
 
-        telemetryLock.lock()
-        self.activeNodeId = activeNode.id
-        telemetryLock.unlock()
+        telemetryLock.withLock {
+            self.activeNodeId = activeNode.id
+        }
 
         // Build or retrieve Xray/Sing-box JSON payload
         let coreConfigData: Data
@@ -75,17 +75,17 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         setTunnelNetworkSettings(networkSettings) { [weak self] error in
             guard let self else { return }
             if let error {
-                self.logger.error("NOTHING_VPN // Failed to apply tunnel network settings: \(error.localizedDescription)")
+                self.logger.error("NORTHY // Failed to apply tunnel network settings: \(error.localizedDescription)")
                 completionHandler(error)
                 return
             }
 
-            self.telemetryLock.lock()
-            self.connectedAt = .now
-            self.telemetryLock.unlock()
+            self.telemetryLock.withLock {
+                self.connectedAt = .now
+            }
 
             self.startXrayOrPacketLoop(coreConfig: coreConfigData)
-            self.logger.notice("NOTHING_VPN // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
+            self.logger.notice("NORTHY // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
             completionHandler(nil)
         }
     }
@@ -93,7 +93,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
     // MARK: - Tunnel Stop Lifecycle
 
     public override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        logger.notice("NOTHING_VPN // Stopping tunnel (reason: \(String(describing: reason)))")
+        logger.notice("NORTHY // Stopping tunnel (reason: \(String(describing: reason)))")
         packetLoopTask?.cancel()
         packetLoopTask = nil
 
@@ -101,10 +101,10 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         LibXrayStopXray()
         #endif
 
-        telemetryLock.lock()
-        connectedAt = nil
-        activeNodeId = nil
-        telemetryLock.unlock()
+        telemetryLock.withLock {
+            connectedAt = nil
+            activeNodeId = nil
+        }
 
         completionHandler()
     }
@@ -120,15 +120,15 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
         switch command {
         case .queryTelemetry:
-            telemetryLock.lock()
-            let snapshot = TunnelRuntimeTelemetry(
-                isConnected: connectedAt != nil,
-                activeNodeId: activeNodeId,
-                rxBytes: rxBytesCounter,
-                txBytes: txBytesCounter,
-                connectedSince: connectedAt
-            )
-            telemetryLock.unlock()
+            let snapshot = telemetryLock.withLock {
+                TunnelRuntimeTelemetry(
+                    isConnected: connectedAt != nil,
+                    activeNodeId: activeNodeId,
+                    rxBytes: rxBytesCounter,
+                    txBytes: txBytesCounter,
+                    connectedSince: connectedAt
+                )
+            }
 
             let encoded = try? JSONEncoder().encode(snapshot)
             completionHandler?(encoded)
@@ -139,9 +139,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             let connection = store.loadConnectionSettings()
             let nodes = store.loadNodes()
 
-            telemetryLock.lock()
-            let currentId = activeNodeId
-            telemetryLock.unlock()
+            let currentId = telemetryLock.withLock { activeNodeId }
 
             if let currentId,
                let node = nodes.first(where: { $0.id == currentId }) {
@@ -178,7 +176,6 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
         if connection.tunnelMode == .proxyOnly {
             // Proxy-Only Mode: expose local HTTP/SOCKS proxy on 127.0.0.1 without capturing default L3 route
-            ipv4Settings.includedRoutes = []
             let proxySettings = NEProxySettings()
             proxySettings.httpEnabled = true
             proxySettings.httpServer = NEProxyServer(address: "127.0.0.1", port: 10809)
@@ -230,9 +227,9 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
     private func startXrayOrPacketLoop(coreConfig: Data) {
         packetLoopTask?.cancel()
 
-        telemetryLock.lock()
-        txBytesCounter &+= UInt64(coreConfig.count)
-        telemetryLock.unlock()
+        telemetryLock.withLock {
+            txBytesCounter &+= UInt64(coreConfig.count)
+        }
 
         #if canImport(LibXray)
         if let jsonString = String(data: coreConfig, encoding: .utf8) {
@@ -254,10 +251,10 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                     batchBytes += UInt64(pkt.count)
                 }
 
-                self.telemetryLock.lock()
-                self.txBytesCounter &+= batchBytes
-                self.rxBytesCounter &+= UInt64(Double(batchBytes) * 1.18)
-                self.telemetryLock.unlock()
+                self.telemetryLock.withLock {
+                    self.txBytesCounter &+= batchBytes
+                    self.rxBytesCounter &+= UInt64(Double(batchBytes) * 1.18)
+                }
 
                 self.packetFlow.writePackets(packets, withProtocols: protocols)
             }
