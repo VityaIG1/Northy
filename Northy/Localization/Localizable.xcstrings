@@ -393,6 +393,62 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "АВТООБНОВЛЕНИЕ ПОДПИСОК ПРИ ВХОДЕ" } }
       }
     },
+    "subscription.happ_masquerade" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "HAPP CLIENT MASQUERADING" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "МАСКИРОВКА ПОД КЛИЕНТ HAPP" } }
+      }
+    },
+    "subscription.happ_masquerade_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sends Happ headers and device fingerprint to bypass panel blocks." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Отправляет заголовки Happ и фингерпринт устройства для обхода блокировок панелей." } }
+      }
+    },
+    "subscription.hwid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "HARDWARE ID (X-HWID)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ИДЕНТИФИКАТОР УСТРОЙСТВА (X-HWID)" } }
+      }
+    },
+    "subscription.hwid_copy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "[COPY HWID]" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "[КОПИРОВАТЬ HWID]" } }
+      }
+    },
+    "subscription.hwid_regen" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "[REGENERATE]" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "[ПЕРЕСОЗДАТЬ]" } }
+      }
+    },
+    "subscription.custom_ua" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CUSTOM USER-AGENT (OPTIONAL)" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ПОЛЬЗОВАТЕЛЬСКИЙ USER-AGENT" } }
+      }
+    },
+    "subscription.ua_reset" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "[RESET UA]" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "[СБРОСИТЬ]" } }
+      }
+    },
+    "subscription.support_link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "[SUPPORT ↗]" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "[ПОДДЕРЖКА ↗]" } }
+      }
+    },
     "subscription.pingafter" : {
       "extractionState" : "manual",
       "localizations" : {

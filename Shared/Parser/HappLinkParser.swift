@@ -32,10 +32,14 @@ public enum ParsedClipboardResult: Sendable {
 
 public struct HappLinkParser: Sendable {
 
-    // MARK: - Entry Point for Paste-to-Connect
+    // MARK: - Entry Point for Paste-to-Connect & Subscription Body Parsing
 
-    /// Parses raw clipboard text containing a single proxy link, multiple newline-separated links,
-    /// a Base64-encoded subscription block, or an HTTPS subscription URL.
+    /// Parses raw clipboard or subscription payload containing:
+    /// - Direct HTTPS subscription URL
+    /// - Happ custom deep links (`happ://add/...` or `v2raytun://import/...`)
+    /// - Raw JSON Xray / sing-box subscription profiles (`{"outbounds": [...]}`)
+    /// - Line-by-line URI list (VLESS, VMess, Trojan, SS, Hysteria2, TUIC)
+    /// - Standard / URL-Safe Base64 subscription blocks
     public static func parseClipboardPayload(_ rawInput: String, subscriptionId: UUID? = nil) throws -> ParsedClipboardResult {
         let trimmed = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -56,14 +60,27 @@ public struct HappLinkParser: Sendable {
             }
         }
 
-        // 3. Attempt direct line-by-line URI parsing
+        // 3. Check if payload is a raw JSON configuration (Sing-box / Xray outbounds)
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
+            if let jsonNodes = tryParseJSONNodes(trimmed, subscriptionId: subscriptionId), !jsonNodes.isEmpty {
+                return .nodes(jsonNodes)
+            }
+        }
+
+        // 4. Attempt direct line-by-line URI parsing
         let directNodes = parseMultiLineURIs(trimmed, subscriptionId: subscriptionId)
         if !directNodes.isEmpty {
             return .nodes(directNodes)
         }
 
-        // 4. Attempt Base64 subscription decoding (standard & URL-safe Base64)
+        // 5. Attempt Base64 subscription decoding (standard & URL-safe Base64)
         if let decodedString = decodeBase64Flexible(trimmed) {
+            let decodedTrimmed = decodedString.trimmingCharacters(in: .whitespacesAndNewlines)
+            if decodedTrimmed.hasPrefix("{") || decodedTrimmed.hasPrefix("[") {
+                if let jsonNodes = tryParseJSONNodes(decodedTrimmed, subscriptionId: subscriptionId), !jsonNodes.isEmpty {
+                    return .nodes(jsonNodes)
+                }
+            }
             let decodedNodes = parseMultiLineURIs(decodedString, subscriptionId: subscriptionId)
             if !decodedNodes.isEmpty {
                 return .nodes(decodedNodes)
@@ -71,6 +88,24 @@ public struct HappLinkParser: Sendable {
         }
 
         throw HappParserError.malformedURI("NO_VALID_NODES_DETECTED")
+    }
+
+    // MARK: - Happ Profile-Title Decoder (Plain UTF-8, base64: prefix, URL Percent-Encoded)
+
+    public static func decodeProfileTitle(_ headerValue: String) -> String {
+        let trimmed = headerValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.lowercased().hasPrefix("base64:") {
+            let b64 = String(trimmed.dropFirst(7))
+            if let data = Data(base64Encoded: b64),
+               let decoded = String(data: data, encoding: .utf8) {
+                let clean = decoded.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !clean.isEmpty { return clean }
+            }
+        }
+        if let unescaped = trimmed.removingPercentEncoding, unescaped != trimmed {
+            return unescaped
+        }
+        return trimmed
     }
 
     // MARK: - Multi-Line URI Extraction
@@ -90,7 +125,7 @@ public struct HappLinkParser: Sendable {
         return nodes
     }
 
-    // MARK: - Single URI Dispatcher
+    // MARK: - Single URI Dispatcher (VLESS, VMess, Trojan, SS, Hysteria2, TUIC)
 
     public static func parseSingleURI(_ uri: String, subscriptionId: UUID? = nil) throws -> ProxyNode {
         let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -103,6 +138,10 @@ public struct HappLinkParser: Sendable {
             return try parseTrojan(trimmed, subscriptionId: subscriptionId)
         } else if lower.hasPrefix("ss://") {
             return try parseShadowsocks(trimmed, subscriptionId: subscriptionId)
+        } else if lower.hasPrefix("hysteria2://") || lower.hasPrefix("hy2://") {
+            return try parseHysteria2(trimmed, subscriptionId: subscriptionId)
+        } else if lower.hasPrefix("tuic://") {
+            return try parseTUIC(trimmed, subscriptionId: subscriptionId)
         } else {
             let scheme = trimmed.components(separatedBy: "://").first ?? "UNKNOWN"
             throw HappParserError.unsupportedScheme(scheme)
@@ -308,6 +347,226 @@ public struct HappLinkParser: Sendable {
         }
     }
 
+    // MARK: - Hysteria 2 Parser (hysteria2:// or hy2://)
+
+    public static func parseHysteria2(_ uri: String, subscriptionId: UUID?) throws -> ProxyNode {
+        let (sanitizedURI, rawFragment) = splitFragmentSafely(uri)
+        let normalized = sanitizedURI.hasPrefix("hy2://")
+            ? sanitizedURI.replacingOccurrences(of: "hy2://", with: "hysteria2://")
+            : sanitizedURI
+
+        guard let url = URL(string: normalized),
+              let host = url.host,
+              let port = url.port ?? (url.scheme == "hysteria2" ? 443 : 443) else {
+            throw HappParserError.malformedURI("HYSTERIA2_HOST_PORT_MISSING")
+        }
+
+        let password = url.user ?? ""
+        let query = queryDictionary(from: URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        let sni = query["sni"] ?? host
+        let allowInsecure = query["insecure"] == "1"
+        let remark = rawFragment ?? query["remark"] ?? "HY2 // \(host)"
+
+        return ProxyNode(
+            remark: remark,
+            protocolType: .hysteria2,
+            serverHost: host,
+            serverPort: port,
+            credential: password,
+            encryption: "none",
+            transport: .udp,
+            security: .tls,
+            sni: sni,
+            allowInsecure: allowInsecure,
+            subscriptionId: subscriptionId,
+            rawURI: uri
+        )
+    }
+
+    // MARK: - TUIC Parser (tuic://)
+
+    public static func parseTUIC(_ uri: String, subscriptionId: UUID?) throws -> ProxyNode {
+        let (sanitizedURI, rawFragment) = splitFragmentSafely(uri)
+        guard let url = URL(string: sanitizedURI),
+              let host = url.host,
+              let port = url.port ?? 443 else {
+            throw HappParserError.malformedURI("TUIC_HOST_PORT_MISSING")
+        }
+
+        let userString = url.user ?? ""
+        let password = url.password ?? ""
+        let credential = password.isEmpty ? userString : "\(userString):\(password)"
+
+        let query = queryDictionary(from: URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        let sni = query["sni"] ?? host
+        let allowInsecure = query["allow_insecure"] == "1" || query["insecure"] == "1"
+        let remark = rawFragment ?? "TUIC // \(host)"
+
+        return ProxyNode(
+            remark: remark,
+            protocolType: .tuic,
+            serverHost: host,
+            serverPort: port,
+            credential: credential,
+            encryption: "none",
+            transport: .udp,
+            security: .tls,
+            sni: sni,
+            allowInsecure: allowInsecure,
+            subscriptionId: subscriptionId,
+            rawURI: uri
+        )
+    }
+
+    // MARK: - Raw JSON Xray / Sing-box Subscription Profile Parser
+
+    public static func tryParseJSONNodes(_ jsonString: String, subscriptionId: UUID?) -> [ProxyNode]? {
+        guard let data = jsonString.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data, options: []) else {
+            return nil
+        }
+
+        var outboundsArray: [[String: Any]] = []
+
+        if let dict = obj as? [String: Any] {
+            if let outbounds = dict["outbounds"] as? [[String: Any]] {
+                outboundsArray = outbounds
+            } else if let servers = dict["servers"] as? [[String: Any]] {
+                outboundsArray = servers
+            }
+        } else if let array = obj as? [[String: Any]] {
+            outboundsArray = array
+        }
+
+        guard !outboundsArray.isEmpty else { return nil }
+
+        var result: [ProxyNode] = []
+        for item in outboundsArray {
+            let typeStr = (item["type"] as? String ?? item["protocol"] as? String ?? "").lowercased()
+            let tag = item["tag"] as? String ?? item["remark"] as? String ?? "Node"
+
+            let server = item["server"] as? String ?? item["address"] as? String
+            let port = item["server_port"] as? Int ?? item["port"] as? Int
+
+            guard let server, let port else { continue }
+
+            switch typeStr {
+            case "vless":
+                let uuid = item["uuid"] as? String ?? ""
+                let flow = item["flow"] as? String
+                var security: StreamSecurity = .none
+                var sni: String?
+                var pbk: String?
+                var sid: String?
+
+                if let tls = item["tls"] as? [String: Any] {
+                    security = .tls
+                    sni = tls["server_name"] as? String
+                    if let reality = tls["reality"] as? [String: Any] {
+                        security = .reality
+                        pbk = reality["public_key"] as? String
+                        sid = reality["short_id"] as? String
+                    }
+                }
+
+                let node = ProxyNode(
+                    remark: tag,
+                    protocolType: .vless,
+                    serverHost: server,
+                    serverPort: port,
+                    credential: uuid,
+                    flow: flow,
+                    transport: .tcp,
+                    security: security,
+                    sni: sni,
+                    realityPublicKey: pbk,
+                    realityShortId: sid,
+                    subscriptionId: subscriptionId,
+                    rawURI: "vless://\(uuid)@\(server):\(port)#\(tag)"
+                )
+                result.append(node)
+
+            case "trojan":
+                let password = item["password"] as? String ?? ""
+                let tls = item["tls"] as? [String: Any]
+                let sni = tls?["server_name"] as? String
+                let node = ProxyNode(
+                    remark: tag,
+                    protocolType: .trojan,
+                    serverHost: server,
+                    serverPort: port,
+                    credential: password,
+                    transport: .tcp,
+                    security: .tls,
+                    sni: sni,
+                    subscriptionId: subscriptionId,
+                    rawURI: "trojan://\(password)@\(server):\(port)#\(tag)"
+                )
+                result.append(node)
+
+            case "shadowsocks":
+                let password = item["password"] as? String ?? ""
+                let method = item["method"] as? String ?? "aes-128-gcm"
+                let node = ProxyNode(
+                    remark: tag,
+                    protocolType: .shadowsocks,
+                    serverHost: server,
+                    serverPort: port,
+                    credential: password,
+                    encryption: method,
+                    transport: .tcp,
+                    security: .none,
+                    subscriptionId: subscriptionId,
+                    rawURI: "ss://\(password)@\(server):\(port)#\(tag)"
+                )
+                result.append(node)
+
+            case "hysteria2", "hy2":
+                let password = item["password"] as? String ?? ""
+                let tls = item["tls"] as? [String: Any]
+                let sni = tls?["server_name"] as? String
+                let node = ProxyNode(
+                    remark: tag,
+                    protocolType: .hysteria2,
+                    serverHost: server,
+                    serverPort: port,
+                    credential: password,
+                    transport: .udp,
+                    security: .tls,
+                    sni: sni,
+                    subscriptionId: subscriptionId,
+                    rawURI: "hy2://\(password)@\(server):\(port)#\(tag)"
+                )
+                result.append(node)
+
+            case "tuic":
+                let uuid = item["uuid"] as? String ?? ""
+                let password = item["password"] as? String ?? ""
+                let tls = item["tls"] as? [String: Any]
+                let sni = tls?["server_name"] as? String
+                let cred = password.isEmpty ? uuid : "\(uuid):\(password)"
+                let node = ProxyNode(
+                    remark: tag,
+                    protocolType: .tuic,
+                    serverHost: server,
+                    serverPort: port,
+                    credential: cred,
+                    transport: .udp,
+                    security: .tls,
+                    sni: sni,
+                    subscriptionId: subscriptionId,
+                    rawURI: "tuic://\(cred)@\(server):\(port)#\(tag)"
+                )
+                result.append(node)
+
+            default:
+                break
+            }
+        }
+
+        return result.isEmpty ? nil : result
+    }
+
     // MARK: - Xray / Sing-box Core JSON Config Builder (Full Happ Parity)
 
     public static func buildXrayCoreConfiguration(
@@ -405,6 +664,20 @@ public struct HappLinkParser: Sendable {
                 "port": node.serverPort,
                 "method": node.encryption,
                 "password": node.credential
+            ]]
+        case .hysteria2:
+            outboundProtocol = "hysteria2"
+            outboundSettings["servers"] = [[
+                "address": node.serverHost,
+                "port": node.serverPort,
+                "password": node.credential
+            ]]
+        case .tuic:
+            outboundProtocol = "tuic"
+            outboundSettings["servers"] = [[
+                "address": node.serverHost,
+                "port": node.serverPort,
+                "uuid": node.credential
             ]]
         }
 

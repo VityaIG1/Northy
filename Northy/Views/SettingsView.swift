@@ -11,6 +11,8 @@ public struct SettingsView: View {
     @State private var showCoreJSONPreview = false
     @State private var customHexInput: String = ""
     @State private var newCIDRInput: String = ""
+    @State private var customUAText: String = ""
+    @State private var hwidCopied: Bool = false
 
     public static let marketingVersion = "0.2.0"
     public static let buildNumber = "2"
@@ -40,6 +42,7 @@ public struct SettingsView: View {
         .background(NothingPalette.trueBlack)
         .onAppear {
             customHexInput = theme.accentHex
+            customUAText = vpnManager.subscriptionSettings.customUserAgent ?? ""
         }
     }
 
@@ -718,6 +721,140 @@ public struct SettingsView: View {
                 }
             }
 
+            // Happ Client Compatibility & Masquerading Card
+            NothingIndustrialCard(isHighlighted: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        NothingMechanicalSwitch(
+                            label: localization.tr("subscription.happ_masquerade"),
+                            isOn: Binding(
+                                get: { vpnManager.subscriptionSettings.enableHappMasquerading },
+                                set: { newValue in
+                                    var updated = vpnManager.subscriptionSettings
+                                    updated.enableHappMasquerading = newValue
+                                    vpnManager.updateSubscriptionSettings(updated)
+                                }
+                            )
+                        )
+
+                        Text(localization.tr("subscription.happ_masquerade_desc"))
+                            .font(NothingTypography.technicalMono(size: 9, weight: .regular))
+                            .foregroundStyle(NothingPalette.mutedGrey)
+                            .lineLimit(2)
+                    }
+
+                    if vpnManager.subscriptionSettings.enableHappMasquerading {
+                        dividerLine
+
+                        // Hardware ID (X-HWID) Display & Actions
+                        VStack(alignment: .leading, spacing: 6) {
+                            subLabel(localization.tr("subscription.hwid"))
+
+                            Text(vpnManager.hwid)
+                                .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                .foregroundStyle(NothingPalette.pureWhite)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(NothingPalette.surfaceElevated)
+                                .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+
+                            HStack(spacing: 8) {
+                                Button {
+                                    UIPasteboard.general.string = vpnManager.hwid
+                                    hwidCopied = true
+                                    Task {
+                                        try? await Task.sleep(for: .seconds(2))
+                                        hwidCopied = false
+                                    }
+                                } label: {
+                                    Text(hwidCopied ? "[COPIED!]" : localization.tr("subscription.hwid_copy"))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(hwidCopied ? NothingPalette.pureWhite : NothingPalette.accentRed)
+                                        .padding(.horizontal, 8)
+                                        .frame(height: 28)
+                                        .background(NothingPalette.surfaceElevated)
+                                        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    _ = vpnManager.regenerateHWID()
+                                } label: {
+                                    Text(localization.tr("subscription.hwid_regen"))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(NothingPalette.pureWhite)
+                                        .padding(.horizontal, 8)
+                                        .frame(height: 28)
+                                        .background(NothingPalette.surfaceElevated)
+                                        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+
+                                Spacer()
+                            }
+                        }
+
+                        dividerLine
+
+                        // User-Agent Override
+                        VStack(alignment: .leading, spacing: 6) {
+                            subLabel(localization.tr("subscription.custom_ua"))
+
+                            HStack(spacing: 8) {
+                                TextField("Happ/3.0.0/ios", text: $customUAText)
+                                    .font(NothingTypography.technicalMono(size: 11, weight: .medium))
+                                    .foregroundStyle(NothingPalette.pureWhite)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 32)
+                                    .background(NothingPalette.surfaceElevated)
+                                    .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+
+                                Button {
+                                    var updated = vpnManager.subscriptionSettings
+                                    let trimmed = customUAText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    updated.customUserAgent = trimmed.isEmpty ? nil : trimmed
+                                    vpnManager.updateSubscriptionSettings(updated)
+                                } label: {
+                                    Text("[SET]")
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(NothingPalette.pureWhite)
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 32)
+                                        .background(NothingPalette.surfaceElevated)
+                                        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    customUAText = ""
+                                    var updated = vpnManager.subscriptionSettings
+                                    updated.customUserAgent = nil
+                                    vpnManager.updateSubscriptionSettings(updated)
+                                } label: {
+                                    Text(localization.tr("subscription.ua_reset"))
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                        .foregroundStyle(NothingPalette.accentRed)
+                                        .padding(.horizontal, 8)
+                                        .frame(height: 32)
+                                        .background(NothingPalette.surfaceElevated)
+                                        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+
             NothingIndustrialCard(isHighlighted: false) {
                 VStack(alignment: .leading, spacing: 14) {
                     NothingMechanicalSwitch(
@@ -758,28 +895,79 @@ public struct SettingsView: View {
             } else {
                 ForEach(vpnManager.subscriptions) { sub in
                     NothingIndustrialCard(isHighlighted: false) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(sub.title) // [\(sub.nodeCount) NODES]")
-                                    .font(NothingTypography.technicalMono(size: 12, weight: .bold))
-                                    .foregroundStyle(NothingPalette.pureWhite)
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("\(sub.title) // [\(sub.nodeCount) NODES]")
+                                        .font(NothingTypography.technicalMono(size: 12, weight: .bold))
+                                        .foregroundStyle(NothingPalette.pureWhite)
+                                        .lineLimit(1)
 
-                                Text(sub.urlString)
-                                    .font(NothingTypography.technicalMono(size: 10, weight: .regular))
-                                    .foregroundStyle(NothingPalette.mutedGrey)
-                                    .lineLimit(1)
+                                    Text(sub.urlString)
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                                        .foregroundStyle(NothingPalette.mutedGrey)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    vpnManager.removeSubscription(sub.id)
+                                } label: {
+                                    Text("[DEL]")
+                                        .font(NothingTypography.technicalMono(size: 11, weight: .bold))
+                                        .foregroundStyle(NothingPalette.accentRed)
+                                }
+                                .buttonStyle(.plain)
                             }
 
-                            Spacer()
-
-                            Button {
-                                vpnManager.removeSubscription(sub.id)
-                            } label: {
-                                Text("[DEL]")
-                                    .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                                    .foregroundStyle(NothingPalette.accentRed)
+                            // Quota & Data Usage (from Subscription-Userinfo)
+                            if sub.uploadBytes != nil || sub.downloadBytes != nil || sub.totalQuotaBytes != nil {
+                                HStack(spacing: 8) {
+                                    if let dl = sub.downloadBytes {
+                                        Text("DL: \(Self.formatQuotaBytes(dl))")
+                                            .font(NothingTypography.technicalMono(size: 9, weight: .semibold))
+                                            .foregroundStyle(NothingPalette.pureWhite)
+                                    }
+                                    if let ul = sub.uploadBytes {
+                                        Text("UL: \(Self.formatQuotaBytes(ul))")
+                                            .font(NothingTypography.technicalMono(size: 9, weight: .semibold))
+                                            .foregroundStyle(NothingPalette.mutedGrey)
+                                    }
+                                    if let total = sub.totalQuotaBytes {
+                                        Text("TOTAL: \(Self.formatQuotaBytes(total))")
+                                            .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                            .foregroundStyle(theme.accentColor)
+                                    }
+                                }
+                                .padding(.top, 2)
                             }
-                            .buttonStyle(.plain)
+
+                            // Expiration Date & Support Link
+                            if sub.formattedExpirationDate != nil || sub.effectiveSupportURL != nil {
+                                HStack {
+                                    if let exp = sub.formattedExpirationDate {
+                                        Text("EXPIRES: \(exp)")
+                                            .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(NothingPalette.surfaceElevated)
+                                            .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+                                            .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+                                            .foregroundStyle(NothingPalette.pureWhite)
+                                    }
+
+                                    Spacer()
+
+                                    if let support = sub.effectiveSupportURL {
+                                        Link(destination: support) {
+                                            Text(localization.tr("subscription.support_link"))
+                                                .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                                .foregroundStyle(NothingPalette.accentRed)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -977,5 +1165,15 @@ public struct SettingsView: View {
             .font(NothingTypography.technicalMono(size: 10, weight: .semibold))
             .foregroundStyle(NothingPalette.mutedGrey)
             .tracking(1.0)
+    }
+
+    private static func formatQuotaBytes(_ bytes: Int64) -> String {
+        guard bytes > 0 else { return "0 MB" }
+        let mb = Double(bytes) / (1024.0 * 1024.0)
+        if mb < 1024.0 {
+            return String(format: "%.1f MB", mb)
+        }
+        let gb = mb / 1024.0
+        return String(format: "%.2f GB", gb)
     }
 }

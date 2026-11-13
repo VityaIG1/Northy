@@ -147,12 +147,43 @@ public final class VPNTunnelManager {
         }
     }
 
+    public var hwid: String {
+        SharedTunnelStore.shared.getOrCreateHWID()
+    }
+
+    @discardableResult
+    public func regenerateHWID() -> String {
+        SharedTunnelStore.shared.regenerateHWID()
+    }
+
     public func fetchRemoteSubscription(from url: URL, existingId: UUID? = nil) async throws {
-        var request = URLRequest(url: url, timeoutInterval: 12)
-        request.setValue(subscriptionSettings.userAgentProfile.rawValue, forHTTPHeaderField: "User-Agent")
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+
+        // 1. Happ HTTP Request Headers & Device Fingerprinting
+        let ua = subscriptionSettings.resolvedUserAgent
+        request.setValue(ua, forHTTPHeaderField: "User-Agent")
+        request.setValue("text/plain, application/json, */*", forHTTPHeaderField: "Accept")
+
+        if subscriptionSettings.enableHappMasquerading {
+            request.setValue("iOS", forHTTPHeaderField: "X-Device-OS")
+            request.setValue(HappDeviceFingerprint.systemVersion, forHTTPHeaderField: "X-Ver-OS")
+            request.setValue(HappDeviceFingerprint.deviceModel, forHTTPHeaderField: "X-Device-Model")
+            request.setValue(SharedTunnelStore.shared.getOrCreateHWID(), forHTTPHeaderField: "X-HWID")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let body = String(data: data, encoding: .utf8) else {
+
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+            let errorBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !errorBody.isEmpty {
+                throw HappParserError.networkSubscriptionFailure("HTTP \(httpResponse.statusCode) // \(errorBody.prefix(120))")
+            } else {
+                throw HappParserError.networkSubscriptionFailure("HTTP \(httpResponse.statusCode)")
+            }
+        }
+
+        guard let body = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) else {
             throw HappParserError.networkSubscriptionFailure("INVALID_ENCODING")
         }
 
@@ -162,39 +193,80 @@ public final class VPNTunnelManager {
             throw HappParserError.networkSubscriptionFailure("NO_NODES_IN_SUBSCRIPTION")
         }
 
-        // Parse optional `Subscription-Userinfo` header (upload=...; download=...; total=...; expire=...)
+        // 2. Parse Happ Subscription Response Headers
         var upload: Int64?
         var download: Int64?
         var total: Int64?
         var expire: TimeInterval?
+        var decodedTitle: String?
+        var updateInterval: Int?
+        var supportUrl: String?
+        var webPageUrl: String?
+        var routingRules: String?
 
-        if let httpResponse = response as? HTTPURLResponse,
-           let userInfo = httpResponse.value(forHTTPHeaderField: "Subscription-Userinfo") {
-            let pairs = userInfo.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
-            for pair in pairs {
-                let kv = pair.split(separator: "=").map(String.init)
-                guard kv.count == 2, let number = Int64(kv[1]) else { continue }
-                switch kv[0].lowercased() {
-                case "upload": upload = number
-                case "download": download = number
-                case "total": total = number
-                case "expire": expire = TimeInterval(number)
-                default: break
+        if let httpResponse = response as? HTTPURLResponse {
+            // Case-insensitive header lookup helper
+            let getHeader: (String) -> String? = { targetKey in
+                for (k, v) in httpResponse.allHeaderFields {
+                    if let keyStr = k as? String, keyStr.caseInsensitiveCompare(targetKey) == .orderedSame {
+                        return v as? String
+                    }
+                }
+                return nil
+            }
+
+            // Subscription-Userinfo (upload=...; download=...; total=...; expire=...)
+            if let userInfo = getHeader("Subscription-Userinfo") {
+                let pairs = userInfo.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+                for pair in pairs {
+                    let kv = pair.split(separator: "=").map(String.init)
+                    guard kv.count == 2, let number = Int64(kv[1].trimmingCharacters(in: .whitespaces)) else { continue }
+                    switch kv[0].lowercased() {
+                    case "upload": upload = number
+                    case "download": download = number
+                    case "total": total = number
+                    case "expire": expire = TimeInterval(number)
+                    default: break
+                    }
                 }
             }
+
+            // Profile-Title (UTF-8 or base64:)
+            if let rawTitle = getHeader("Profile-Title") {
+                decodedTitle = HappLinkParser.decodeProfileTitle(rawTitle)
+            }
+
+            // Profile-Update-Interval (in hours)
+            if let rawInterval = getHeader("Profile-Update-Interval"),
+               let intVal = Int(rawInterval.trimmingCharacters(in: .whitespaces)) {
+                updateInterval = intVal > 100 ? max(1, intVal / 3600) : intVal
+            }
+
+            // Support-Url & Profile-Web-Page-Url
+            supportUrl = getHeader("Support-Url")
+            webPageUrl = getHeader("Profile-Web-Page-Url")
+
+            // Routing rules header
+            routingRules = getHeader("Routing")
         }
 
-        let subTitle = url.host() ?? "SUBSCRIPTION"
+        let fallbackTitle = (url.host ?? "SUBSCRIPTION").uppercased()
+        let finalTitle = decodedTitle?.isEmpty == false ? decodedTitle! : fallbackTitle
+
         let source = SubscriptionSource(
             id: subId,
-            title: subTitle.uppercased(),
+            title: finalTitle,
             urlString: url.absoluteString,
             lastUpdated: .now,
             nodeCount: subNodes.count,
             uploadBytes: upload,
             downloadBytes: download,
             totalQuotaBytes: total,
-            expireTimestamp: expire
+            expireTimestamp: expire,
+            updateIntervalHours: updateInterval,
+            supportURL: supportUrl,
+            webPageURL: webPageUrl,
+            routingRulesPayload: routingRules
         )
 
         subscriptions.removeAll { $0.urlString == url.absoluteString || $0.id == subId }

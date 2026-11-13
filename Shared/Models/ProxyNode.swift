@@ -7,9 +7,18 @@ public enum ProxyProtocolType: String, Codable, CaseIterable, Sendable {
     case vmess = "VMESS"
     case trojan = "TROJAN"
     case shadowsocks = "SS"
+    case hysteria2 = "HY2"
+    case tuic = "TUIC"
 
     public var badgeLabel: String {
-        rawValue
+        switch self {
+        case .vless: return "VLESS"
+        case .vmess: return "VMESS"
+        case .trojan: return "TROJAN"
+        case .shadowsocks: return "SS"
+        case .hysteria2: return "HYSTERIA2"
+        case .tuic: return "TUIC"
+        }
     }
 }
 
@@ -21,6 +30,7 @@ public enum TransportNetwork: String, Codable, Sendable {
     case grpc = "grpc"
     case httpUpgrade = "httpupgrade"
     case xhttp = "xhttp"
+    case udp = "udp"
 }
 
 public enum StreamSecurity: String, Codable, Sendable {
@@ -131,6 +141,10 @@ public struct SubscriptionSource: Identifiable, Codable, Hashable, Sendable {
     public var downloadBytes: Int64?
     public var totalQuotaBytes: Int64?
     public var expireTimestamp: TimeInterval?
+    public var updateIntervalHours: Int?
+    public var supportURL: String?
+    public var webPageURL: String?
+    public var routingRulesPayload: String?
 
     public init(
         id: UUID = UUID(),
@@ -141,7 +155,11 @@ public struct SubscriptionSource: Identifiable, Codable, Hashable, Sendable {
         uploadBytes: Int64? = nil,
         downloadBytes: Int64? = nil,
         totalQuotaBytes: Int64? = nil,
-        expireTimestamp: TimeInterval? = nil
+        expireTimestamp: TimeInterval? = nil,
+        updateIntervalHours: Int? = nil,
+        supportURL: String? = nil,
+        webPageURL: String? = nil,
+        routingRulesPayload: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -152,6 +170,24 @@ public struct SubscriptionSource: Identifiable, Codable, Hashable, Sendable {
         self.downloadBytes = downloadBytes
         self.totalQuotaBytes = totalQuotaBytes
         self.expireTimestamp = expireTimestamp
+        self.updateIntervalHours = updateIntervalHours
+        self.supportURL = supportURL
+        self.webPageURL = webPageURL
+        self.routingRulesPayload = routingRulesPayload
+    }
+
+    public var effectiveSupportURL: URL? {
+        if let s = supportURL, let u = URL(string: s) { return u }
+        if let w = webPageURL, let u = URL(string: w) { return u }
+        return nil
+    }
+
+    public var formattedExpirationDate: String? {
+        guard let expire = expireTimestamp, expire > 0 else { return nil }
+        let date = Date(timeIntervalSince1970: expire)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd.MM.yyyy"
+        return formatter.string(from: date)
     }
 }
 
@@ -334,17 +370,19 @@ public struct HappConnectionSettings: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Happ Subscription Settings (Настройки подписок)
+// MARK: - Happ Subscription Settings (Настройки подписок & Маскировка Happ)
 
 public enum SubscriptionUserAgentProfile: String, Codable, CaseIterable, Sendable {
-    case happ = "Happ/0.2.0 (iOS; Northy)"
+    case happDefault = "Happ/3.0.0/ios"
+    case happLegacy = "Happ/0.2.0 (iOS; Northy)"
     case v2rayNG = "v2rayNG/1.8.23"
     case clashMeta = "ClashMetaForAndroid/2.10.1"
     case singBox = "SFI/1.10.0 (iOS; sing-box 1.10.0)"
 
     public var shortLabel: String {
         switch self {
-        case .happ: return "HAPP // DEFAULT"
+        case .happDefault: return "HAPP 3.0 // DEFAULT"
+        case .happLegacy: return "HAPP LEGACY"
         case .v2rayNG: return "V2RAYNG"
         case .clashMeta: return "CLASH.META"
         case .singBox: return "SING-BOX"
@@ -357,19 +395,35 @@ public struct HappSubscriptionSettings: Codable, Hashable, Sendable {
     public var updateIntervalHours: Int
     public var userAgentProfile: SubscriptionUserAgentProfile
     public var pingAfterSync: Bool
+    public var enableHappMasquerading: Bool
+    public var customUserAgent: String?
 
     public static let availableIntervals: [Int] = [1, 6, 12, 24]
 
     public init(
         autoUpdateOnLaunch: Bool = true,
         updateIntervalHours: Int = 6,
-        userAgentProfile: SubscriptionUserAgentProfile = .happ,
-        pingAfterSync: Bool = true
+        userAgentProfile: SubscriptionUserAgentProfile = .happDefault,
+        pingAfterSync: Bool = true,
+        enableHappMasquerading: Bool = true,
+        customUserAgent: String? = nil
     ) {
         self.autoUpdateOnLaunch = autoUpdateOnLaunch
         self.updateIntervalHours = updateIntervalHours
         self.userAgentProfile = userAgentProfile
         self.pingAfterSync = pingAfterSync
+        self.enableHappMasquerading = enableHappMasquerading
+        self.customUserAgent = customUserAgent
+    }
+
+    public var resolvedUserAgent: String {
+        if enableHappMasquerading {
+            if let custom = customUserAgent, !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return custom.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            return "Happ/3.0.0/ios"
+        }
+        return userAgentProfile.rawValue
     }
 }
 

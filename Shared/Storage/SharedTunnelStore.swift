@@ -1,5 +1,11 @@
 import Foundation
 import Network
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(Darwin)
+import Darwin
+#endif
 
 // MARK: - Shared App Group Store & IPC Protocol
 
@@ -41,6 +47,7 @@ public final class SharedTunnelStore: Sendable {
         static let activeXrayConfigJSON = "nothing.vpn.active_xray_json.v1"
         static let languageOverride = "nothing.vpn.language_override.v1"
         static let activeTelemetry = "nothing.vpn.active_telemetry.v1"
+        static let deviceHWID = "nothing.vpn.device_hwid.v1"
     }
 
     public static let shared = SharedTunnelStore()
@@ -197,6 +204,24 @@ public final class SharedTunnelStore: Sendable {
         defaults.removeObject(forKey: Keys.activeTelemetry)
     }
 
+    // MARK: - Persistent Unique Device Hardware UUID (X-HWID)
+
+    public func getOrCreateHWID() -> String {
+        if let existing = defaults.string(forKey: Keys.deviceHWID), !existing.isEmpty {
+            return existing
+        }
+        let fresh = UUID().uuidString.lowercased()
+        defaults.set(fresh, forKey: Keys.deviceHWID)
+        return fresh
+    }
+
+    @discardableResult
+    public func regenerateHWID() -> String {
+        let fresh = UUID().uuidString.lowercased()
+        defaults.set(fresh, forKey: Keys.deviceHWID)
+        return fresh
+    }
+
     // MARK: - IP & DNS Resolution Helpers
 
     public static func resolveIPv4(host: String) -> String? {
@@ -270,6 +295,32 @@ public final class SharedTunnelStore: Sendable {
             latencyMs: 41
         )
     ]
+}
+
+// MARK: - Happ Device Fingerprinting (Hardware Identifier & Dynamic OS Version)
+
+public enum HappDeviceFingerprint {
+
+    /// Hardware machine identifier (e.g. "iPhone14,2", "iPhone13,4") retrieved via `uname` system call.
+    public static var deviceModel: String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let mirror = Mirror(reflecting: systemInfo.machine)
+        let identifier = mirror.children.reduce("") { identifier, element in
+            guard let value = element.value as? Int8, value != 0 else { return identifier }
+            return identifier + String(UnicodeScalar(UInt8(value)))
+        }
+        return identifier.isEmpty ? "iPhone14,2" : identifier
+    }
+
+    /// Dynamic system iOS version (e.g. "18.1", "17.5") via `UIDevice.current.systemVersion`.
+    public static var systemVersion: String {
+        #if canImport(UIKit)
+        return UIDevice.current.systemVersion
+        #else
+        return "18.1"
+        #endif
+    }
 }
 
 // MARK: - Multi-Mode Happ Node Pinger (TCP Handshake, HTTP 204 URLTest, ICMP/Echo)
