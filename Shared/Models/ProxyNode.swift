@@ -160,6 +160,7 @@ public struct SubscriptionSource: Identifiable, Codable, Hashable, Sendable {
     public var supportURL: String?
     public var webPageURL: String?
     public var routingRulesPayload: String?
+    public var announcement: String?
 
     public init(
         id: UUID = UUID(),
@@ -174,7 +175,8 @@ public struct SubscriptionSource: Identifiable, Codable, Hashable, Sendable {
         updateIntervalHours: Int? = nil,
         supportURL: String? = nil,
         webPageURL: String? = nil,
-        routingRulesPayload: String? = nil
+        routingRulesPayload: String? = nil,
+        announcement: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -189,6 +191,7 @@ public struct SubscriptionSource: Identifiable, Codable, Hashable, Sendable {
         self.supportURL = supportURL
         self.webPageURL = webPageURL
         self.routingRulesPayload = routingRulesPayload
+        self.announcement = announcement
     }
 
     public var effectiveSupportURL: URL? {

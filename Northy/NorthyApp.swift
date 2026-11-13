@@ -38,7 +38,8 @@ public struct NothingRootShellView: View {
                 case .servers:
                     ServersView(
                         vpnManager: vpnManager,
-                        localization: localization
+                        localization: localization,
+                        onOpenSettings: { activeTab = .settings }
                     )
                 case .settings:
                     SettingsView(

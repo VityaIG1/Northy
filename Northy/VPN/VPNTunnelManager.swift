@@ -203,6 +203,7 @@ public final class VPNTunnelManager {
         var supportUrl: String?
         var webPageUrl: String?
         var routingRules: String?
+        var announcementText: String?
 
         if let httpResponse = response as? HTTPURLResponse {
             // Case-insensitive header lookup helper
@@ -248,6 +249,11 @@ public final class VPNTunnelManager {
 
             // Routing rules header
             routingRules = getHeader("Routing")
+
+            // Profile-Description / Announce / Notice
+            if let rawAnnounce = getHeader("Profile-Description") ?? getHeader("Announce") ?? getHeader("Notice") ?? getHeader("Description") {
+                announcementText = HappLinkParser.decodeProfileTitle(rawAnnounce)
+            }
         }
 
         let fallbackTitle = (url.host ?? "SUBSCRIPTION").uppercased()
@@ -266,7 +272,8 @@ public final class VPNTunnelManager {
             updateIntervalHours: updateInterval,
             supportURL: supportUrl,
             webPageURL: webPageUrl,
-            routingRulesPayload: routingRules
+            routingRulesPayload: routingRules,
+            announcement: announcementText
         )
 
         subscriptions.removeAll { $0.urlString == url.absoluteString || $0.id == subId }
@@ -308,6 +315,41 @@ public final class VPNTunnelManager {
         subscriptions.removeAll { $0.id == id }
         SharedTunnelStore.shared.saveSubscriptions(subscriptions)
         nodes.removeAll { $0.subscriptionId == id }
+        SharedTunnelStore.shared.saveNodes(nodes)
+    }
+
+    public func updateSubscription(_ updated: SubscriptionSource) {
+        if let idx = subscriptions.firstIndex(where: { $0.id == updated.id }) {
+            subscriptions[idx] = updated
+            SharedTunnelStore.shared.saveSubscriptions(subscriptions)
+        }
+    }
+
+    public func measureSubscriptionLatencies(for subscriptionId: UUID) async {
+        let targets = nodes.filter { $0.subscriptionId == subscriptionId }
+        guard !targets.isEmpty else { return }
+
+        let currentPingSettings = pingSettings
+        let results: [UUID: Int?] = await withTaskGroup(of: (UUID, Int?).self) { group in
+            for node in targets {
+                group.addTask {
+                    let ms = await TCPNodePinger.measureNode(node, settings: currentPingSettings)
+                    return (node.id, ms)
+                }
+            }
+            var collected: [UUID: Int?] = [:]
+            for await (id, ms) in group {
+                collected[id] = ms
+            }
+            return collected
+        }
+
+        for index in nodes.indices {
+            let id = nodes[index].id
+            if let measuredOptional = results[id] {
+                nodes[index].latencyMs = measuredOptional
+            }
+        }
         SharedTunnelStore.shared.saveNodes(nodes)
     }
 

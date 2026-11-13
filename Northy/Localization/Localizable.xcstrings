@@ -623,6 +623,97 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "LICENSES & ATTRIBUTION" } },
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "ЛИЦЕНЗИИ И БЛАГОДАРНОСТИ" } }
       }
+    },
+    "action.hide_all" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hide everything" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Скрыть всё" } }
+      }
+    },
+    "action.show_all" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show everything" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показать всё" } }
+      }
+    },
+    "import.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ADD SUBSCRIPTION" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ДОБАВИТЬ ПОДПИСКУ" } }
+      }
+    },
+    "import.clipboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PASTE FROM CLIPBOARD" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ВСТАВИТЬ ИЗ БУФЕРА" } }
+      }
+    },
+    "import.url" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "IMPORT VIA URL" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ИМПОРТ ПО ССЫЛКЕ" } }
+      }
+    },
+    "import.qr" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SCAN QR CODE" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "СКАНИРОВАТЬ QR-КОД" } }
+      }
+    },
+    "import.manual" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "MANUAL CONFIG / URI" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "РУЧНОЙ ВВОД / URI" } }
+      }
+    },
+    "import.url.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "https://example.com/sub/..." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "https://example.com/sub/..." } }
+      }
+    },
+    "import.url.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "[IMPORT]" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "[ИМПОРТИРОВАТЬ]" } }
+      }
+    },
+    "subscription.details.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SUBSCRIPTION INFO" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ИНФОРМАЦИЯ О ПОДПИСКЕ" } }
+      }
+    },
+    "subscription.expires" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Expires: %@" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Истекает: %@" } }
+      }
+    },
+    "subscription.autoupdate_suffix" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Autoupdate - %d h." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Автообновление - %d ч." } }
+      }
+    },
+    "subscription.unassigned" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "MANUAL / IMPORTED NODES" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "ИМПОРТИРОВАННЫЕ УЗЛЫ" } }
+      }
     }
   },
   "version" : "1.0"

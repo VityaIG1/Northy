@@ -192,7 +192,22 @@ public final class LocalizationManager {
             "settings.support.vitya_role": "Application Developer & Architect",
 
             // Licenses & Attribution
-            "settings.licenses.header": "LICENSES & ATTRIBUTION"
+            "settings.licenses.header": "LICENSES & ATTRIBUTION",
+
+            // Happ Layout & Subscription UX
+            "action.hide_all": "Hide everything",
+            "action.show_all": "Show everything",
+            "import.title": "ADD SUBSCRIPTION",
+            "import.clipboard": "PASTE FROM CLIPBOARD",
+            "import.url": "IMPORT VIA URL",
+            "import.qr": "SCAN QR CODE",
+            "import.manual": "MANUAL CONFIG / URI",
+            "import.url.placeholder": "https://example.com/sub/...",
+            "import.url.action": "[IMPORT]",
+            "subscription.details.title": "SUBSCRIPTION INFO",
+            "subscription.expires": "Expires: %@",
+            "subscription.autoupdate_suffix": "Autoupdate - %d h.",
+            "subscription.unassigned": "MANUAL / IMPORTED NODES"
         ],
         "ru": [
             "app.title": "NOTHING // VPN",
@@ -301,7 +316,22 @@ public final class LocalizationManager {
             "settings.support.vitya_role": "Разработчик приложения",
 
             // Licenses & Attribution
-            "settings.licenses.header": "ЛИЦЕНЗИИ И БЛАГОДАРНОСТИ"
+            "settings.licenses.header": "ЛИЦЕНЗИИ И БЛАГОДАРНОСТИ",
+
+            // Happ Layout & Subscription UX
+            "action.hide_all": "Скрыть всё",
+            "action.show_all": "Показать всё",
+            "import.title": "ДОБАВИТЬ ПОДПИСКУ",
+            "import.clipboard": "ВСТАВИТЬ ИЗ БУФЕРА",
+            "import.url": "ИМПОРТ ПО ССЫЛКЕ",
+            "import.qr": "СКАНИРОВАТЬ QR-КОД",
+            "import.manual": "РУЧНОЙ ВВОД / URI",
+            "import.url.placeholder": "https://example.com/sub/...",
+            "import.url.action": "[ИМПОРТИРОВАТЬ]",
+            "subscription.details.title": "ИНФОРМАЦИЯ О ПОДПИСКЕ",
+            "subscription.expires": "Истекает: %@",
+            "subscription.autoupdate_suffix": "Автообновление - %d ч.",
+            "subscription.unassigned": "ИМПОРТИРОВАННЫЕ УЗЛЫ"
         ]
     ]
 }
