@@ -12,8 +12,8 @@ public struct SettingsView: View {
     @State private var hwidCopied: Bool = false
     @State private var customHexInput: String = ""
 
-    public static let marketingVersion = "0.2.0"
-    public static let buildNumber = "2"
+    public static let marketingVersion = "0.3.0"
+    public static let buildNumber = "3"
 
     public init(vpnManager: VPNTunnelManager, localization: LocalizationManager) {
         self.vpnManager = vpnManager
@@ -687,7 +687,7 @@ public struct SettingsView: View {
         Section {
             VStack(spacing: 4) {
                 NothingDotMatrixLabel(
-                    text: "VERSION 0.2.0",
+                    text: "VERSION 0.3.0",
                     dotSize: 1.8,
                     spacing: 0.9,
                     activeColor: theme.accentColor
