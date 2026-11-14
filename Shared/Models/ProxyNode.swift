@@ -485,6 +485,17 @@ public enum RoutingMode: String, Codable, CaseIterable, Sendable {
             return "routing.mode.direct.desc"
         }
     }
+
+    public var displayName: String {
+        switch self {
+        case .globalTunnel:
+            return "Global Tunnel"
+        case .splitBypassLANAndRegional:
+            return "Bypass LAN & Regional"
+        case .directOnly:
+            return "Direct Only"
+        }
+    }
 }
 
 public enum DNSProviderOption: String, Codable, CaseIterable, Sendable {

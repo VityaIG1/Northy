@@ -896,8 +896,8 @@ public struct HappLinkParser: Sendable {
             "routeOnly": !connection.sniffOverrideDestination
         ]
 
-        // Inbounds (TUN + Local SOCKS5 + HTTP Proxy + DNS Inbound)
-        var inbounds: [[String: Any]] = [
+        // Inbounds (Local SOCKS5 + HTTP Proxy + DNS Inbound)
+        let inbounds: [[String: Any]] = [
             [
                 "tag": "socks-in",
                 "protocol": "socks",

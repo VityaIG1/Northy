@@ -88,7 +88,7 @@ public struct TunnelDiagnosticsSheet: View {
             Divider().background(NothingPalette.gridStroke)
 
             HStack(spacing: 16) {
-                metricItem(label: "CORE STATUS", value: vpnManager.telemetry.coreStatus ?? (vpnManager.isConnected ? "RUNNING" : "STOPPED"))
+                metricItem(label: "CORE STATUS", value: vpnManager.telemetry.coreStatus)
                 metricItem(label: "RX SPEED", value: formatSpeed(vpnManager.rxSpeedBytesPerSec))
                 metricItem(label: "TX SPEED", value: formatSpeed(vpnManager.txSpeedBytesPerSec))
             }

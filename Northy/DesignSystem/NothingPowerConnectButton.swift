@@ -36,134 +36,21 @@ public struct NothingPowerConnectButton: View {
             onToggle()
         }) {
             ZStack {
-                // 1. Dynamic Radial Ambient Glow
+                // Dynamic Radial Glow and Dot-Matrix Canvas in a single TimelineView
                 TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
                     let now = timeline.date.timeIntervalSinceReferenceDate
-                    let pulse: CGFloat = {
-                        if isTransitioning {
-                            return 0.85 + 0.25 * CGFloat(sin(now * 6.0))
-                        } else if isConnected {
-                            return 0.90 + 0.15 * CGFloat(sin(now * 2.2))
-                        } else {
-                            return 0.45 + 0.10 * CGFloat(sin(now * 1.5))
-                        }
-                    }()
+                    ZStack {
+                        ambientGlow(now: now)
 
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    (isConnected || isTransitioning ? accentColor : NothingPalette.pureWhite).opacity(
-                                        isConnected ? 0.28 * pulse : (isTransitioning ? 0.35 * pulse : 0.04 * pulse)
-                                    ),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 24,
-                                endRadius: 104
-                            )
-                        )
+                        Canvas { context, size in
+                            drawPowerMatrix(context: &context, size: size, now: now)
+                        }
                         .frame(width: 208, height: 208)
-                        .blur(radius: isTransitioning ? 18 : 14)
-                        .allowsHitTesting(false)
-                }
-
-                // 2. Concentric Dot-Matrix & Orbital Energy Canvas
-                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-                    let now = timeline.date.timeIntervalSinceReferenceDate
-
-                    Canvas { context, size in
-                        let cx = size.width / 2.0
-                        let cy = size.height / 2.0
-
-                        // A. Connecting Energy Wave Expansion Ring
-                        if isTransitioning {
-                            let waveProgress = (now * 1.4).truncatingRemainder(dividingBy: 1.0)
-                            let waveRadius = 40.0 + CGFloat(waveProgress) * 58.0
-                            let waveAlpha = (1.0 - waveProgress) * 0.5
-                            var wavePath = Path()
-                            wavePath.addArc(
-                                center: CGPoint(x: cx, y: cy),
-                                radius: waveRadius,
-                                startAngle: .zero,
-                                endAngle: .radians(2.0 * .pi),
-                                clockwise: false
-                            )
-                            context.stroke(
-                                wavePath,
-                                with: .color(accentColor.opacity(waveAlpha)),
-                                style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])
-                            )
-                        }
-
-                        // B. Cardinal LED Guides (N, E, S, W crosshair pins)
-                        let cardinalRadius: CGFloat = 100.0
-                        let cardinalPulse = 0.5 + 0.5 * sin(now * (isConnected ? 2.5 : 1.2))
-                        let cardinalColor: Color = isConnected ? accentColor : (isTransitioning ? NothingPalette.pureWhite : NothingPalette.dimMatrixDot)
-
-                        for angle in [0.0, .pi / 2.0, .pi, 3.0 * .pi / 2.0] {
-                            let kx = cx + cos(angle) * cardinalRadius
-                            let ky = cy + sin(angle) * cardinalRadius
-                            let kRect = CGRect(x: kx - 1.5, y: ky - 1.5, width: 3.0, height: 3.0)
-                            context.fill(kRect, with: .color(cardinalColor.opacity(0.35 + 0.45 * cardinalPulse)))
-                        }
-
-                        // C. Concentric Rings of Precision Matrix Dots
-                        for (ringIdx, ring) in Self.rings.enumerated() {
-                            let r = ring.radius
-                            let baseSize = ring.size
-
-                            // Alternate rotational direction for orbital bursts
-                            let orbitalSpeed = ringIdx.isMultiple(of: 2) ? 2.4 : -2.0
-                            let orbitalAngle = (now * orbitalSpeed).truncatingRemainder(dividingBy: 2.0 * .pi)
-
-                            for i in 0..<ring.count {
-                                let dotAngle = Double(i) / Double(ring.count) * 2.0 * .pi
-                                let px = cx + cos(dotAngle) * r
-                                let py = cy + sin(dotAngle) * r
-
-                                let dotColor: Color
-                                let dotScale: CGFloat
-
-                                if isTransitioning {
-                                    // Orbital wave ignition burst
-                                    var diff = orbitalAngle - dotAngle
-                                    while diff < 0 { diff += 2.0 * .pi }
-                                    while diff >= 2.0 * .pi { diff -= 2.0 * .pi }
-
-                                    let headSpan = .pi / 2.5
-                                    if diff < headSpan {
-                                        let factor = pow(1.0 - diff / headSpan, 2.0)
-                                        dotScale = 1.0 + CGFloat(factor) * 0.6
-                                        dotColor = (diff < 0.12) ? NothingPalette.pureWhite : accentColor.opacity(0.4 + 0.6 * factor)
-                                    } else {
-                                        dotScale = 1.0
-                                        dotColor = NothingPalette.dimMatrixDot.opacity(0.25)
-                                    }
-                                } else if isConnected {
-                                    // Steady LED ignition with gentle breathing pulse
-                                    let breathe = sin(now * 2.2 + Double(ringIdx) * 0.5)
-                                    let intensity = 0.55 + 0.45 * breathe
-                                    dotScale = 1.0 + CGFloat(breathe) * 0.12
-                                    dotColor = accentColor.opacity(0.40 + 0.55 * intensity)
-                                } else {
-                                    // Idle dot-matrix: calm ambient state
-                                    let idleBreathe = 0.5 + 0.5 * sin(now * 1.4 + Double(i) * 0.2)
-                                    dotScale = 1.0
-                                    dotColor = NothingPalette.dimMatrixDot.opacity(0.22 + 0.16 * idleBreathe)
-                                }
-
-                                let d = baseSize * dotScale
-                                let rect = CGRect(x: px - d / 2, y: py - d / 2, width: d, height: d)
-                                context.fill(Path(ellipseIn: rect), with: .color(dotColor))
-                            }
-                        }
                     }
                 }
-                .frame(width: 208, height: 208)
                 .allowsHitTesting(false)
 
-                // 3. Center Elevated Nothing OS Power Button Core
+                // Center Elevated Nothing OS Power Button Core
                 Circle()
                     .fill(NothingPalette.surfaceElevated)
                     .frame(width: 64, height: 64)
@@ -183,7 +70,7 @@ public struct NothingPowerConnectButton: View {
                         y: 0
                     )
 
-                // 4. Center Power Glyph
+                // Center Power Glyph
                 Image(systemName: "power")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(
@@ -198,6 +85,123 @@ public struct NothingPowerConnectButton: View {
         }
         .buttonStyle(NothingPowerButtonStyle())
         .accessibilityLabel(isConnected ? "Disconnect VPN" : "Connect VPN")
+    }
+
+    // MARK: - Ambient Radial Glow
+
+    @ViewBuilder
+    private func ambientGlow(now: TimeInterval) -> some View {
+        let pulse: CGFloat = {
+            if isTransitioning {
+                return 0.85 + 0.25 * CGFloat(sin(now * 6.0))
+            } else if isConnected {
+                return 0.90 + 0.15 * CGFloat(sin(now * 2.2))
+            } else {
+                return 0.45 + 0.10 * CGFloat(sin(now * 1.5))
+            }
+        }()
+
+        let glowColor: Color = isConnected
+            ? accentColor.opacity(0.28 * pulse)
+            : (isTransitioning ? accentColor.opacity(0.35 * pulse) : NothingPalette.pureWhite.opacity(0.04 * pulse))
+
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [glowColor, Color.clear],
+                    center: .center,
+                    startRadius: 24,
+                    endRadius: 104
+                )
+            )
+            .frame(width: 208, height: 208)
+            .blur(radius: isTransitioning ? 18 : 14)
+    }
+
+    // MARK: - Precision Matrix & Orbital Burst Drawing
+
+    private func drawPowerMatrix(context: inout GraphicsContext, size: CGSize, now: TimeInterval) {
+        let cx = size.width / 2.0
+        let cy = size.height / 2.0
+
+        // A. Connecting Energy Wave Expansion Ring
+        if isTransitioning {
+            let waveProgress = (now * 1.4).truncatingRemainder(dividingBy: 1.0)
+            let waveRadius = 40.0 + CGFloat(waveProgress) * 58.0
+            let waveAlpha = (1.0 - waveProgress) * 0.5
+            var wavePath = Path()
+            wavePath.addArc(
+                center: CGPoint(x: cx, y: cy),
+                radius: waveRadius,
+                startAngle: .zero,
+                endAngle: .radians(2.0 * .pi),
+                clockwise: false
+            )
+            context.stroke(
+                wavePath,
+                with: .color(accentColor.opacity(waveAlpha)),
+                style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])
+            )
+        }
+
+        // B. Cardinal LED Guides (N, E, S, W crosshair pins)
+        let cardinalRadius: CGFloat = 100.0
+        let cardinalPulse = 0.5 + 0.5 * sin(now * (isConnected ? 2.5 : 1.2))
+        let cardinalColor: Color = isConnected ? accentColor : (isTransitioning ? NothingPalette.pureWhite : NothingPalette.dimMatrixDot)
+
+        for angle in [0.0, .pi / 2.0, .pi, 3.0 * .pi / 2.0] {
+            let kx = cx + cos(angle) * cardinalRadius
+            let ky = cy + sin(angle) * cardinalRadius
+            let kRect = CGRect(x: kx - 1.5, y: ky - 1.5, width: 3.0, height: 3.0)
+            context.fill(Path(kRect), with: .color(cardinalColor.opacity(0.35 + 0.45 * cardinalPulse)))
+        }
+
+        // C. Concentric Rings of Precision Matrix Dots
+        for (ringIdx, ring) in Self.rings.enumerated() {
+            let r = ring.radius
+            let baseSize = ring.size
+
+            let orbitalSpeed = ringIdx.isMultiple(of: 2) ? 2.4 : -2.0
+            let orbitalAngle = (now * orbitalSpeed).truncatingRemainder(dividingBy: 2.0 * .pi)
+
+            for i in 0..<ring.count {
+                let dotAngle = Double(i) / Double(ring.count) * 2.0 * .pi
+                let px = cx + cos(dotAngle) * r
+                let py = cy + sin(dotAngle) * r
+
+                let dotColor: Color
+                let dotScale: CGFloat
+
+                if isTransitioning {
+                    var diff = orbitalAngle - dotAngle
+                    while diff < 0 { diff += 2.0 * .pi }
+                    while diff >= 2.0 * .pi { diff -= 2.0 * .pi }
+
+                    let headSpan = .pi / 2.5
+                    if diff < headSpan {
+                        let factor = pow(1.0 - diff / headSpan, 2.0)
+                        dotScale = 1.0 + CGFloat(factor) * 0.6
+                        dotColor = (diff < 0.12) ? NothingPalette.pureWhite : accentColor.opacity(0.4 + 0.6 * factor)
+                    } else {
+                        dotScale = 1.0
+                        dotColor = NothingPalette.dimMatrixDot.opacity(0.25)
+                    }
+                } else if isConnected {
+                    let breathe = sin(now * 2.2 + Double(ringIdx) * 0.5)
+                    let intensity = 0.55 + 0.45 * breathe
+                    dotScale = 1.0 + CGFloat(breathe) * 0.12
+                    dotColor = accentColor.opacity(0.40 + 0.55 * intensity)
+                } else {
+                    let idleBreathe = 0.5 + 0.5 * sin(now * 1.4 + Double(i) * 0.2)
+                    dotScale = 1.0
+                    dotColor = NothingPalette.dimMatrixDot.opacity(0.22 + 0.16 * idleBreathe)
+                }
+
+                let d = baseSize * dotScale
+                let rect = CGRect(x: px - d / 2, y: py - d / 2, width: d, height: d)
+                context.fill(Path(ellipseIn: rect), with: .color(dotColor))
+            }
+        }
     }
 }
 
