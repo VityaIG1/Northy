@@ -478,13 +478,17 @@ public final class TUNPacketBridge: @unchecked Sendable {
 
                 upstream.send(content: vlessHeader, completion: .contentProcessed({ [weak self, weak state] sendErr in
                     guard let self, let state, sendErr == nil, !state.isClosed else {
-                        self?.connectDirectTCP(state: state)
+                        if let self, let state, !state.isClosed {
+                            self.connectDirectTCP(state: state)
+                        }
                         return
                     }
 
                     upstream.receive(minimumIncompleteLength: 2, maximumLength: 256) { [weak self, weak state] resp, _, _, respErr in
                         guard let self, let state, let resp, resp.count >= 2, resp[0] == 0x00, respErr == nil, !state.isClosed else {
-                            self?.connectDirectTCP(state: state)
+                            if let self, let state, !state.isClosed {
+                                self.connectDirectTCP(state: state)
+                            }
                             return
                         }
 
