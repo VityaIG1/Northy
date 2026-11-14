@@ -18,12 +18,14 @@ public final class ThemeManager {
     public var isRoundedCorners: Bool {
         didSet {
             UserDefaults.standard.set(isRoundedCorners, forKey: StorageKeys.isRoundedCorners)
+            (UserDefaults(suiteName: SharedTunnelStore.appGroupIdentifier) ?? .standard).set(isRoundedCorners, forKey: StorageKeys.isRoundedCorners)
         }
     }
 
     public var accentHex: String {
         didSet {
             UserDefaults.standard.set(accentHex, forKey: StorageKeys.accentHex)
+            (UserDefaults(suiteName: SharedTunnelStore.appGroupIdentifier) ?? .standard).set(accentHex, forKey: StorageKeys.accentHex)
             applyUIKitAppearance()
         }
     }
@@ -72,8 +74,13 @@ public final class ThemeManager {
     ]
 
     private init() {
-        self.isRoundedCorners = UserDefaults.standard.bool(forKey: StorageKeys.isRoundedCorners)
-        let savedHex = UserDefaults.standard.string(forKey: StorageKeys.accentHex) ?? Self.defaultAccentHex
+        let appGroupDefaults = UserDefaults(suiteName: SharedTunnelStore.appGroupIdentifier) ?? .standard
+        self.isRoundedCorners = appGroupDefaults.object(forKey: StorageKeys.isRoundedCorners) != nil
+            ? appGroupDefaults.bool(forKey: StorageKeys.isRoundedCorners)
+            : UserDefaults.standard.bool(forKey: StorageKeys.isRoundedCorners)
+        let savedHex = appGroupDefaults.string(forKey: StorageKeys.accentHex)
+            ?? UserDefaults.standard.string(forKey: StorageKeys.accentHex)
+            ?? Self.defaultAccentHex
         self.accentHex = savedHex
         applyUIKitAppearance()
     }
