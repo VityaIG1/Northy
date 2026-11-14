@@ -60,19 +60,8 @@ public struct ServersView: View {
         }
         .background(NothingPalette.trueBlack)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    onOpenSettings?()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(NothingPalette.pureWhite)
-                }
-                .accessibilityLabel("Settings")
-            }
-
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
+                VStack(spacing: 4) {
                     NothingDotMatrixLabel(
                         text: "NORTHY",
                         dotSize: 2.2,
@@ -95,6 +84,7 @@ public struct ServersView: View {
                         )
                     }
                 }
+                .padding(.top, 2)
             }
 
             ToolbarItem(placement: .topBarTrailing) {
@@ -121,107 +111,32 @@ public struct ServersView: View {
         }
     }
 
-    // MARK: - 2. Center Hero Power Control
-
-    private func isoFromNode(_ node: ProxyNode) -> String? {
-        let r = node.remark.uppercased()
-        if r.contains("🇺🇸") || r.contains("USA") || r.contains("UNITED STATES") || r.hasPrefix("US-") || r.hasPrefix("US ") { return "US" }
-        if r.contains("🇷🇺") || r.contains("RUSSIA") || r.hasPrefix("RU-") || r.hasPrefix("RU ") { return "RU" }
-        if r.contains("🇩🇪") || r.contains("GERMANY") || r.hasPrefix("DE-") { return "DE" }
-        if r.contains("🇫🇷") || r.contains("FRANCE") || r.hasPrefix("FR-") { return "FR" }
-        if r.contains("🇬🇧") || r.contains("UK") || r.contains("BRITAIN") || r.hasPrefix("GB-") { return "GB" }
-        if r.contains("🇯🇵") || r.contains("JAPAN") || r.hasPrefix("JP-") { return "JP" }
-        if r.contains("🇨🇳") || r.contains("CHINA") || r.hasPrefix("CN-") { return "CN" }
-        if r.contains("🇮🇳") || r.contains("INDIA") || r.hasPrefix("IN-") { return "IN" }
-        if r.contains("🇧🇷") || r.contains("BRAZIL") || r.hasPrefix("BR-") { return "BR" }
-        if r.contains("🇦🇺") || r.contains("AUSTRALIA") || r.hasPrefix("AU-") { return "AU" }
-        if r.contains("🇨🇦") || r.contains("CANADA") || r.hasPrefix("CA-") { return "CA" }
-        if r.contains("🇳🇱") || r.contains("NETHERLANDS") || r.hasPrefix("NL-") { return "NL" }
-        if r.contains("🇸🇪") || r.contains("SWEDEN") || r.hasPrefix("SE-") { return "SE" }
-        if r.contains("🇫🇮") || r.contains("FINLAND") || r.hasPrefix("FI-") { return "FI" }
-        if r.contains("🇵🇱") || r.contains("POLAND") || r.hasPrefix("PL-") { return "PL" }
-        if r.contains("🇹🇷") || r.contains("TURKEY") || r.hasPrefix("TR-") { return "TR" }
-        if r.contains("🇸🇬") || r.contains("SINGAPORE") || r.hasPrefix("SG-") { return "SG" }
-        if r.contains("🇰🇿") || r.contains("KAZAKHSTAN") || r.hasPrefix("KZ-") { return "KZ" }
-        return nil
-    }
+    // MARK: - 2. Center Hero Power Control (Snake Wave + 360° Radar)
 
     private var centralHeroPowerControl: some View {
         VStack(spacing: 14) {
-            // Prominent Circular / Dot-Matrix Power Button
-            Button {
-                launchPulseCount += 1
+            // Nothing OS Dot-Matrix Snake Wave (Responsive to live throughput)
+            NothingDotMatrixSnakeWave(
+                isConnected: vpnManager.isConnected,
+                isTransitioning: vpnManager.isTransitioning,
+                rxSpeedBytesPerSec: vpnManager.rxSpeedBytesPerSec,
+                txSpeedBytesPerSec: vpnManager.txSpeedBytesPerSec,
+                accentColor: theme.accentColor
+            )
+            .frame(height: 28)
+            .padding(.horizontal, 20)
+
+            // Nothing OS 360° Dot-Matrix Radar Connect Button
+            NothingRadarConnectButton(
+                isConnected: vpnManager.isConnected,
+                isTransitioning: vpnManager.isTransitioning,
+                accentColor: theme.accentColor
+            ) {
                 Task {
                     await vpnManager.toggleTunnelConnection()
                 }
-            } label: {
-                ZStack {
-                    // World map background
-                    DotMatrixWorldMap(
-                        connectedCountryISO: vpnManager.selectedNode.flatMap { isoFromNode($0) },
-                        accentColor: theme.accentColor,
-                        isConnected: vpnManager.isConnected
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 240)
-                    .clipped()
-                    .allowsHitTesting(false)
-
-                    // Outer animated status ring
-                    Circle()
-                        .strokeBorder(
-                            vpnManager.isConnected ? theme.accentColor.opacity(0.35) : NothingPalette.gridStroke.opacity(0.6),
-                            lineWidth: 1
-                        )
-                        .frame(width: 154, height: 154)
-
-                    // Concentric breathing status ring
-                    if vpnManager.isConnected || vpnManager.isTransitioning {
-                        Circle()
-                            .strokeBorder(
-                                theme.accentColor.opacity(vpnManager.isTransitioning ? 0.75 : 0.45),
-                                style: StrokeStyle(lineWidth: 2, dash: [4, 6])
-                            )
-                            .frame(width: 140, height: 140)
-                            .rotationEffect(.degrees(vpnManager.isTransitioning ? Double(launchPulseCount * 90) : 0))
-                            .animation(.linear(duration: 4).repeatForever(autoreverses: false), value: vpnManager.isConnected)
-                    }
-
-                    // Starfall ring during transitioning
-                    StarfallRing(isActive: vpnManager.isTransitioning, accentColor: theme.accentColor)
-                        .frame(width: 164, height: 164)
-                        .allowsHitTesting(false)
-
-                    // Central Button Core
-                    Circle()
-                        .fill(vpnManager.isConnected ? theme.accentColor.opacity(0.18) : NothingPalette.surfaceElevated)
-                        .frame(width: 116, height: 116)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(
-                                    vpnManager.isConnected ? theme.accentColor : NothingPalette.gridStroke,
-                                    lineWidth: vpnManager.isConnected ? 2 : 1
-                                )
-                        )
-                        .shadow(
-                            color: vpnManager.isConnected ? theme.accentColor.opacity(0.4) : Color.clear,
-                            radius: 18,
-                            x: 0,
-                            y: 0
-                        )
-
-                    // Power Glyph
-                    Image(systemName: "power")
-                        .font(.system(size: 42, weight: .bold))
-                        .foregroundStyle(
-                            vpnManager.isConnected
-                                ? theme.accentColor
-                                : (vpnManager.isTransitioning ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
-                        )
-                }
-                .frame(height: 240)
             }
-            .buttonStyle(.plain)
+            .frame(height: 184)
 
             // Active Node & Status Headline Label
             VStack(spacing: 4) {
@@ -238,8 +153,8 @@ public struct ServersView: View {
                 }
 
                 if let node = vpnManager.selectedNode {
-                    Text(node.remark)
-                        .font(NothingTypography.technicalMono(size: 14, weight: .bold))
+                    Text(Self.cleanNodeRemark(node.remark))
+                        .font(NothingTypography.technicalMono(size: 13, weight: .bold))
                         .foregroundStyle(NothingPalette.pureWhite)
                         .lineLimit(1)
 
@@ -252,20 +167,21 @@ public struct ServersView: View {
                         .foregroundStyle(NothingPalette.mutedGrey)
                 }
             }
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 
-    // MARK: - 3. Live Session Telemetry Strip (Speed & Volume)
+    // MARK: - 3. Live Session Telemetry Strip (2x2 Grid: Speeds & Cumulative Volumes)
 
     private var liveSessionTelemetryStrip: some View {
         NothingIndustrialCard(isHighlighted: vpnManager.isConnected) {
             VStack(spacing: 10) {
-                // Top Row: Real-Time Download & Upload Speed
+                // Row 1: Real-Time Download & Upload Speed
                 HStack(spacing: 12) {
-                    speedMetricBlock(
-                        arrowSymbol: "↓",
+                    telemetryGridCell(
+                        icon: "↓",
                         title: localization.tr("telemetry.speed.down"),
                         value: Self.formatTransferRate(vpnManager.rxSpeedBytesPerSec),
                         isActive: vpnManager.isConnected,
@@ -276,8 +192,8 @@ public struct ServersView: View {
                         .fill(NothingPalette.gridStroke)
                         .frame(width: 1, height: 32)
 
-                    speedMetricBlock(
-                        arrowSymbol: "↑",
+                    telemetryGridCell(
+                        icon: "↑",
                         title: localization.tr("telemetry.speed.up"),
                         value: Self.formatTransferRate(vpnManager.txSpeedBytesPerSec),
                         isActive: vpnManager.isConnected,
@@ -289,44 +205,61 @@ public struct ServersView: View {
                     .fill(NothingPalette.gridStroke)
                     .frame(height: 1)
 
-                // Bottom Row: Live Session Uptime & Cumulative Volume
-                TimelineView(.periodic(from: .now, by: 1.0)) { context in
-                    let uptime = Self.formatUptime(
-                        since: vpnManager.connectedSince,
-                        now: context.date,
-                        isConnected: vpnManager.isConnected
+                // Row 2: Cumulative Download & Upload Volume (No duplicate session timer)
+                HStack(spacing: 12) {
+                    telemetryGridCell(
+                        icon: "↓",
+                        title: localization.tr("telemetry.down"),
+                        value: Self.formatByteCount(vpnManager.telemetry.rxBytes),
+                        isActive: vpnManager.isConnected,
+                        accentColor: NothingPalette.pureWhite.opacity(0.85)
                     )
 
-                    HStack(spacing: 8) {
-                        volumeMetricColumn(
-                            label: localization.tr("telemetry.uptime"),
-                            value: uptime,
-                            isActive: vpnManager.isConnected
-                        )
+                    Rectangle()
+                        .fill(NothingPalette.gridStroke)
+                        .frame(width: 1, height: 32)
 
-                        Rectangle()
-                            .fill(NothingPalette.gridStroke)
-                            .frame(width: 1, height: 26)
-
-                        volumeMetricColumn(
-                            label: localization.tr("telemetry.down"),
-                            value: Self.formatByteCount(vpnManager.telemetry.rxBytes),
-                            isActive: vpnManager.isConnected
-                        )
-
-                        Rectangle()
-                            .fill(NothingPalette.gridStroke)
-                            .frame(width: 1, height: 26)
-
-                        volumeMetricColumn(
-                            label: localization.tr("telemetry.up"),
-                            value: Self.formatByteCount(vpnManager.telemetry.txBytes),
-                            isActive: vpnManager.isConnected
-                        )
-                    }
+                    telemetryGridCell(
+                        icon: "↑",
+                        title: localization.tr("telemetry.up"),
+                        value: Self.formatByteCount(vpnManager.telemetry.txBytes),
+                        isActive: vpnManager.isConnected,
+                        accentColor: NothingPalette.pureWhite.opacity(0.85)
+                    )
                 }
             }
         }
+    }
+
+    private func telemetryGridCell(
+        icon: String,
+        title: String,
+        value: String,
+        isActive: Bool,
+        accentColor: Color
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text(icon)
+                .font(NothingTypography.technicalMono(size: 13, weight: .black))
+                .foregroundStyle(isActive ? accentColor : NothingPalette.mutedGrey)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(NothingTypography.technicalMono(size: 8, weight: .semibold))
+                    .foregroundStyle(NothingPalette.mutedGrey)
+                    .tracking(0.8)
+                    .lineLimit(1)
+
+                Text(value)
+                    .font(NothingTypography.technicalMono(size: 13, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(isActive ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - 4. Quick Visibility Toggle Row ("Hide everything" / "Show everything")
@@ -395,26 +328,33 @@ public struct ServersView: View {
                         }
                     } label: {
                         Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(NothingPalette.pureWhite)
                             .frame(width: 20, height: 20)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
 
-                    // Title & Subtitle (Last sync + Auto-update interval)
+                    // Title & Subtitle (Clean Title without emoji truncation, concise auto-update info)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(sub.title)
-                            .font(NothingTypography.technicalMono(size: 14, weight: .bold))
+                        Text(Self.cleanSubscriptionTitle(sub.title))
+                            .font(NothingTypography.technicalMono(size: 13, weight: .bold))
                             .foregroundStyle(NothingPalette.pureWhite)
                             .lineLimit(1)
 
                         let syncDateString = Self.formatSyncDate(sub.lastUpdated)
                         let intervalHours = sub.updateIntervalHours ?? vpnManager.subscriptionSettings.updateIntervalHours
-                        Text("\(syncDateString) | Autoupdate - \(intervalHours) h.")
-                            .font(NothingTypography.technicalMono(size: 9, weight: .regular))
-                            .foregroundStyle(NothingPalette.mutedGrey)
-                            .lineLimit(1)
+                        HStack(spacing: 5) {
+                            Text(syncDateString)
+                            Text("•")
+                            Text("AUTO: \(intervalHours)H")
+                            Text("•")
+                            Text("[\(subNodes.count)]")
+                                .foregroundStyle(theme.accentColor)
+                        }
+                        .font(NothingTypography.technicalMono(size: 9, weight: .medium))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                        .lineLimit(1)
                     }
 
                     Spacer(minLength: 4)
@@ -486,63 +426,8 @@ public struct ServersView: View {
                     }
                 }
 
-                // Quota & Expiration Bar
-                HStack(spacing: 8) {
-                    // Info Icon (i) -> Opens full subscription modal
-                    Button {
-                        selectedSubscriptionForDetails = sub
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(NothingPalette.mutedGrey)
-                    }
-                    .buttonStyle(.plain)
-
-                    // Visual Progress Bar (Used / Total)
-                    let usedBytes = (sub.uploadBytes ?? 0) + (sub.downloadBytes ?? 0)
-                    let totalBytes = sub.totalQuotaBytes
-                    let progressRatio = Self.calculateProgress(used: usedBytes, total: totalBytes)
-
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: theme.chipCornerRadius)
-                                .fill(NothingPalette.surfaceElevated)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: theme.chipCornerRadius)
-                                        .strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
-                                )
-
-                            RoundedRectangle(cornerRadius: theme.chipCornerRadius)
-                                .fill(theme.accentColor)
-                                .frame(width: max(4, geo.size.width * CGFloat(progressRatio)))
-
-                            Text(Self.formatQuotaDisplay(used: usedBytes, total: totalBytes))
-                                .font(NothingTypography.technicalMono(size: 9, weight: .bold))
-                                .foregroundStyle(NothingPalette.pureWhite)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                        }
-                    }
-                    .frame(height: 22)
-
-                    // Expiration Date Label
-                    if let exp = sub.formattedExpirationDate {
-                        Text("Expires: \(exp)")
-                            .font(NothingTypography.technicalMono(size: 9, weight: .medium))
-                            .foregroundStyle(NothingPalette.mutedGrey)
-                            .lineLimit(1)
-                    }
-
-                    // Telegram / Support Airplane Action Button
-                    if let support = sub.effectiveSupportURL {
-                        Link(destination: support) {
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(theme.accentColor)
-                                .frame(width: 22, height: 22)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                // Precision Industrial Quota & Expiration Section
+                subscriptionQuotaSection(sub)
 
                 // Provider Announcement / Notice Banner
                 if let announcement = sub.announcement, !announcement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -566,22 +451,90 @@ public struct ServersView: View {
         }
     }
 
+    private func subscriptionQuotaSection(_ sub: SubscriptionSource) -> some View {
+        let usedBytes = (sub.uploadBytes ?? 0) + (sub.downloadBytes ?? 0)
+        let totalBytes = sub.totalQuotaBytes
+        let progressRatio = Self.calculateProgress(used: usedBytes, total: totalBytes)
+
+        return VStack(spacing: 6) {
+            // Upper Info Line: (i) Info Button + Quota Readout + Expiry Badge + Support Airplane
+            HStack(spacing: 6) {
+                Button {
+                    selectedSubscriptionForDetails = sub
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                }
+                .buttonStyle(.plain)
+
+                Text(Self.formatQuotaDisplay(used: usedBytes, total: totalBytes))
+                    .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                    .foregroundStyle(NothingPalette.pureWhite)
+
+                Spacer(minLength: 4)
+
+                if let exp = sub.formattedExpirationDate {
+                    Text("[EXP: \(exp)]")
+                        .font(NothingTypography.technicalMono(size: 9, weight: .medium))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                        .lineLimit(1)
+                }
+
+                if let support = sub.effectiveSupportURL {
+                    Link(destination: support) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(theme.accentColor)
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Sleek Precision Meter Track
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(NothingPalette.surfaceElevated)
+                        .overlay(Capsule().strokeBorder(NothingPalette.gridStroke, lineWidth: 0.5))
+
+                    Capsule()
+                        .fill(theme.accentColor)
+                        .frame(width: max(4, geo.size.width * CGFloat(progressRatio)))
+                }
+            }
+            .frame(height: 4)
+        }
+    }
+
     private func announcementBanner(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Rectangle()
-                .fill(theme.accentColor)
-                .frame(width: 3)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "megaphone.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(theme.accentColor)
+
+                Text("// NOTICE")
+                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                    .foregroundStyle(theme.accentColor)
+                    .tracking(1.0)
+            }
 
             Text(text)
-                .font(NothingTypography.technicalMono(size: 9, weight: .regular))
-                .foregroundStyle(NothingPalette.pureWhite)
+                .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                .foregroundStyle(NothingPalette.pureWhite.opacity(0.9))
                 .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(NothingPalette.surfaceElevated.opacity(0.8))
-        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(NothingPalette.surfaceElevated.opacity(0.6))
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.chipCornerRadius)
+                .strokeBorder(theme.accentColor.opacity(0.35), lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
     }
 
@@ -589,19 +542,29 @@ public struct ServersView: View {
 
     private func serverNodeRow(_ node: ProxyNode) -> some View {
         let isSelected = vpnManager.selectedNode?.id == node.id
+        let countryCode = Self.countryCode(for: node.remark)
+        let cleanedRemark = Self.cleanNodeRemark(node.remark)
 
         return Button {
             vpnManager.selectNode(node.id)
         } label: {
-            HStack(spacing: 10) {
-                // Country Flag or Globe Icon
-                Text(Self.countryFlagOrIcon(for: node.remark))
-                    .font(.system(size: 18))
-                    .frame(width: 24, height: 24)
+            HStack(spacing: 8) {
+                // Nothing OS Dot-Matrix Country Code Badge (e.g. [DE], [US], [FI])
+                Text("[\(countryCode)]")
+                    .font(NothingTypography.technicalMono(size: 9, weight: .bold))
+                    .foregroundStyle(isSelected ? theme.accentColor : NothingPalette.mutedGrey)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(isSelected ? theme.accentColor.opacity(0.12) : NothingPalette.surfaceElevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .strokeBorder(isSelected ? theme.accentColor.opacity(0.6) : NothingPalette.gridStroke, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
 
                 // Server Name and Badge Line
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(node.remark)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(cleanedRemark)
                         .font(NothingTypography.technicalMono(size: 12, weight: isSelected ? .bold : .medium))
                         .foregroundStyle(isSelected ? NothingPalette.pureWhite : NothingPalette.pureWhite.opacity(0.9))
                         .lineLimit(1)
@@ -622,9 +585,10 @@ public struct ServersView: View {
                     Circle()
                         .fill(theme.accentColor)
                         .frame(width: 6, height: 6)
+                        .shadow(color: theme.accentColor.opacity(0.8), radius: 3)
                 } else {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(NothingPalette.dimMatrixDot)
                 }
             }
@@ -734,11 +698,12 @@ public struct ServersView: View {
     // MARK: - Ping Indicator View
 
     private func pingIndicatorView(latencyMs: Int?) -> some View {
-        VStack(alignment: .trailing, spacing: 3) {
+        let isFast = (latencyMs ?? 999) < 100
+        return VStack(alignment: .trailing, spacing: 3) {
             if let latencyMs {
                 Text("\(latencyMs) MS")
                     .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                    .foregroundStyle(latencyMs < 100 ? NothingPalette.pureWhite : theme.accentColor)
+                    .foregroundStyle(isFast ? NothingPalette.pureWhite : theme.accentColor)
             } else {
                 Text("-- MS")
                     .font(NothingTypography.technicalMono(size: 10, weight: .regular))
@@ -749,88 +714,62 @@ public struct ServersView: View {
                 ForEach(0..<4, id: \.self) { bar in
                     let isLit = Self.isSignalBarLit(barIndex: bar, latencyMs: latencyMs)
                     Rectangle()
-                        .fill(isLit ? (latencyMs ?? 999 < 100 ? NothingPalette.pureWhite : theme.accentColor) : NothingPalette.dimMatrixDot)
+                        .fill(isLit ? (isFast ? NothingPalette.pureWhite : theme.accentColor) : NothingPalette.dimMatrixDot)
                         .frame(width: 3, height: CGFloat(4 + bar * 3))
                 }
             }
         }
     }
 
-    // MARK: - Metric Helpers
-
-    private func speedMetricBlock(
-        arrowSymbol: String,
-        title: String,
-        value: String,
-        isActive: Bool,
-        accentColor: Color
-    ) -> some View {
-        HStack(spacing: 8) {
-            Text(arrowSymbol)
-                .font(NothingTypography.technicalMono(size: 13, weight: .black))
-                .foregroundStyle(isActive ? accentColor : NothingPalette.mutedGrey)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(NothingTypography.technicalMono(size: 8, weight: .semibold))
-                    .foregroundStyle(NothingPalette.mutedGrey)
-                    .tracking(0.8)
-
-                Text(value)
-                    .font(NothingTypography.technicalMono(size: 13, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(isActive ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func volumeMetricColumn(label: String, value: String, isActive: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(NothingTypography.technicalMono(size: 8, weight: .regular))
-                .foregroundStyle(NothingPalette.mutedGrey)
-                .lineLimit(1)
-
-            Text(value)
-                .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(isActive ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    // MARK: - Status Notification Banner (Compact Terminal-Style Pill with 4s Auto-Dismiss)
 
     private func diagnosticBanner(_ message: String) -> some View {
-        HStack(spacing: 10) {
-            Rectangle()
+        HStack(spacing: 8) {
+            Circle()
                 .fill(theme.accentColor)
-                .frame(width: 3, height: 26)
+                .frame(width: 5, height: 5)
+                .shadow(color: theme.accentColor.opacity(0.8), radius: 2)
+
+            Text("//")
+                .font(NothingTypography.technicalMono(size: 9, weight: .black))
+                .foregroundStyle(theme.accentColor)
 
             Text(message)
                 .font(NothingTypography.technicalMono(size: 10, weight: .medium))
                 .foregroundStyle(NothingPalette.pureWhite)
                 .lineLimit(2)
 
-            Spacer()
+            Spacer(minLength: 4)
 
             Button {
-                vpnManager.statusBannerMessage = nil
+                withAnimation(.snappy(duration: 0.2)) {
+                    vpnManager.statusBannerMessage = nil
+                }
             } label: {
                 Text("[X]")
                     .font(NothingTypography.technicalMono(size: 9, weight: .bold))
                     .foregroundStyle(NothingPalette.mutedGrey)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(NothingPalette.surfaceElevated)
-        .overlay(Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1))
+        .padding(.vertical, 7)
+        .background(NothingPalette.surfaceElevated.opacity(0.95))
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.chipCornerRadius)
+                .strokeBorder(theme.accentColor.opacity(0.35), lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
+        .task(id: message) {
+            try? await Task.sleep(for: .seconds(4))
+            withAnimation(.snappy(duration: 0.25)) {
+                if vpnManager.statusBannerMessage == message {
+                    vpnManager.statusBannerMessage = nil
+                }
+            }
+        }
     }
 
     private var statusHeadlineText: String {
@@ -846,46 +785,79 @@ public struct ServersView: View {
 
     // MARK: - Static Formatting Utilities
 
-    public static func countryFlagOrIcon(for remark: String) -> String {
-        for char in remark {
-            if char.unicodeScalars.contains(where: { (0x1F1E6...0x1F1FF).contains($0.value) }) {
-                return String(char)
-            }
-        }
+    public static func cleanSubscriptionTitle(_ rawTitle: String) -> String {
+        var cleaned = rawTitle
+        cleaned = cleaned.replacingOccurrences(of: "✅", with: "[OK]")
+        cleaned = cleaned.replacingOccurrences(of: "✔", with: "[OK]")
+        cleaned = cleaned.replacingOccurrences(of: "🌐", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "⚡", with: "")
+        cleaned = cleaned.replacingOccurrences(of: "- [OK]", with: "[OK]")
+        cleaned = cleaned.replacingOccurrences(of: "-  [OK]", with: "[OK]")
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? rawTitle : cleaned
+    }
+
+    public static func cleanNodeRemark(_ remark: String) -> String {
+        var cleaned = ""
         for char in remark {
             if char.isEmoji {
-                return String(char)
+                continue
+            }
+            cleaned.append(char)
+        }
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? remark : cleaned
+    }
+
+    public static func countryCode(for remark: String) -> String {
+        let scalars = Array(remark.unicodeScalars)
+        for i in 0..<scalars.count {
+            let s = scalars[i]
+            if (0x1F1E6...0x1F1FF).contains(s.value) {
+                if i + 1 < scalars.count && (0x1F1E6...0x1F1FF).contains(scalars[i + 1].value) {
+                    if let u1 = UnicodeScalar(s.value - 0x1F1E6 + 65),
+                       let u2 = UnicodeScalar(scalars[i + 1].value - 0x1F1E6 + 65) {
+                        return "\(Character(u1))\(Character(u2))"
+                    }
+                }
             }
         }
+
         let upper = remark.uppercased()
-        if upper.contains("TRAFFIC") || upper.contains("LIMIT") || upper.contains("INFO") || upper.contains("GIB") || upper.contains("GB") {
-            return "🌐"
+        if upper.contains("TRAFFIC") || upper.contains("LIMIT") || upper.contains("GIB") || upper.contains("GB") || upper.contains("INFO") {
+            return "INFO"
         }
-        if upper.contains("FINLAND") || upper.contains(" FI ") || upper.hasPrefix("FI-") || upper.hasPrefix("FI ") { return "🇫🇮" }
-        if upper.contains("GERMANY") || upper.contains(" DE ") || upper.hasPrefix("DE-") || upper.hasPrefix("DE ") { return "🇩🇪" }
-        if upper.contains("NETHERLANDS") || upper.contains(" HOLLAND") || upper.contains(" NL ") || upper.hasPrefix("NL-") { return "🇳🇱" }
-        if upper.contains("RUSSIA") || upper.contains(" RU ") || upper.hasPrefix("RU-") || upper.hasPrefix("RU ") { return "🇷🇺" }
-        if upper.contains("USA") || upper.contains("UNITED STATES") || upper.contains(" US ") || upper.hasPrefix("US-") { return "🇺🇸" }
-        if upper.contains("UK") || upper.contains("UNITED KINGDOM") || upper.contains(" GB ") || upper.hasPrefix("GB-") { return "🇬🇧" }
-        if upper.contains("TURKEY") || upper.contains(" TR ") || upper.hasPrefix("TR-") { return "🇹🇷" }
-        if upper.contains("SWEDEN") || upper.contains(" SE ") || upper.hasPrefix("SE-") { return "🇸🇪" }
-        if upper.contains("POLAND") || upper.contains(" PL ") || upper.hasPrefix("PL-") { return "🇵🇱" }
-        if upper.contains("FRANCE") || upper.contains(" FR ") || upper.hasPrefix("FR-") { return "🇫🇷" }
-        if upper.contains("SINGAPORE") || upper.contains(" SG ") || upper.hasPrefix("SG-") { return "🇸🇬" }
-        if upper.contains("JAPAN") || upper.contains(" JP ") || upper.hasPrefix("JP-") { return "🇯🇵" }
-        if upper.contains("KAZAKHSTAN") || upper.contains(" KZ ") || upper.hasPrefix("KZ-") { return "🇰🇿" }
-        return "🌐"
+        if upper.contains("FINLAND") || upper.contains(" FI ") || upper.hasPrefix("FI-") || upper.hasPrefix("FI ") { return "FI" }
+        if upper.contains("GERMANY") || upper.contains(" DE ") || upper.hasPrefix("DE-") || upper.hasPrefix("DE ") { return "DE" }
+        if upper.contains("NETHERLANDS") || upper.contains(" HOLLAND") || upper.contains(" NL ") || upper.hasPrefix("NL-") { return "NL" }
+        if upper.contains("RUSSIA") || upper.contains(" RU ") || upper.hasPrefix("RU-") || upper.hasPrefix("RU ") { return "RU" }
+        if upper.contains("USA") || upper.contains("UNITED STATES") || upper.contains(" US ") || upper.hasPrefix("US-") { return "US" }
+        if upper.contains("UK") || upper.contains("UNITED KINGDOM") || upper.contains(" GB ") || upper.hasPrefix("GB-") { return "GB" }
+        if upper.contains("TURKEY") || upper.contains(" TR ") || upper.hasPrefix("TR-") { return "TR" }
+        if upper.contains("SWEDEN") || upper.contains(" SE ") || upper.hasPrefix("SE-") { return "SE" }
+        if upper.contains("POLAND") || upper.contains(" PL ") || upper.hasPrefix("PL-") { return "PL" }
+        if upper.contains("FRANCE") || upper.contains(" FR ") || upper.hasPrefix("FR-") { return "FR" }
+        if upper.contains("SINGAPORE") || upper.contains(" SG ") || upper.hasPrefix("SG-") { return "SG" }
+        if upper.contains("JAPAN") || upper.contains(" JP ") || upper.hasPrefix("JP-") { return "JP" }
+        if upper.contains("KAZAKHSTAN") || upper.contains(" KZ ") || upper.hasPrefix("KZ-") { return "KZ" }
+        if upper.contains("AUSTRALIA") || upper.contains(" AU ") || upper.hasPrefix("AU-") { return "AU" }
+        if upper.contains("CANADA") || upper.contains(" CA ") || upper.hasPrefix("CA-") { return "CA" }
+        return "NODE"
+    }
+
+    public static func countryFlagOrIcon(for remark: String) -> String {
+        return countryCode(for: remark)
     }
 
     public static func nodeBadgeLine(for node: ProxyNode) -> String {
         var parts: [String] = [node.protocolType.badgeLabel]
         parts.append(node.transport.rawValue.uppercased())
         if node.security == .reality {
-            parts.append("Reality")
+            parts.append("REALITY")
         } else if node.security == .tls {
             parts.append("TLS")
         }
-        return parts.joined(separator: " | ")
+        return parts.joined(separator: " // ")
     }
 
     public static func formatSyncDate(_ date: Date) -> String {
@@ -896,14 +868,14 @@ public struct ServersView: View {
 
     public static func formatQuotaDisplay(used: Int64, total: Int64?) -> String {
         let usedGB = Double(used) / (1024.0 * 1024.0 * 1024.0)
-        let formattedUsed = usedGB < 1.0 ? String(format: "%.1f GB", max(0.1, usedGB)) : String(format: "%.0f GB", usedGB)
+        let formattedUsed = usedGB < 1.0 ? String(format: "%.1f GB", max(0.1, usedGB)) : String(format: "%.1f GB", usedGB)
 
         guard let total, total > 0 else {
-            return "\(formattedUsed)/∞"
+            return "\(formattedUsed) / ∞"
         }
         let totalGB = Double(total) / (1024.0 * 1024.0 * 1024.0)
-        let formattedTotal = totalGB < 1.0 ? String(format: "%.1f GB", totalGB) : String(format: "%.0f GB", totalGB)
-        return "\(formattedUsed)/\(formattedTotal)"
+        let formattedTotal = totalGB < 1.0 ? String(format: "%.1f GB", totalGB) : String(format: "%.1f GB", totalGB)
+        return "\(formattedUsed) / \(formattedTotal)"
     }
 
     public static func calculateProgress(used: Int64, total: Int64?) -> Double {
