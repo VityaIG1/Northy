@@ -12,8 +12,8 @@ public struct SettingsView: View {
     @State private var hwidCopied: Bool = false
     @State private var customHexInput: String = ""
 
-    public static let marketingVersion = "0.3.0"
-    public static let buildNumber = "3"
+    public static let marketingVersion = "0.4.0"
+    public static let buildNumber = "4"
 
     public init(vpnManager: VPNTunnelManager, localization: LocalizationManager) {
         self.vpnManager = vpnManager
@@ -685,18 +685,18 @@ public struct SettingsView: View {
 
     private var versionFooterSection: some View {
         Section {
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 NothingDotMatrixLabel(
-                    text: "VERSION 0.3.0",
-                    dotSize: 1.8,
-                    spacing: 0.9,
-                    activeColor: theme.accentColor
+                    text: "NORTHY",
+                    dotSize: 2.2,
+                    spacing: 1.1,
+                    activeColor: NothingPalette.pureWhite
                 )
 
-                Text("Fork of incy")
-                    .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                    .foregroundStyle(NothingPalette.pureWhite.opacity(0.85))
-                    .tracking(1.2)
+                Text("VERSION 0.4.0 // BUILD 4")
+                    .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                    .foregroundStyle(theme.accentColor)
+                    .tracking(1.4)
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 14)

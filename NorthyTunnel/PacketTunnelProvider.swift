@@ -36,9 +36,12 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                 code: 404,
                 userInfo: [NSLocalizedDescriptionKey: "NO_ACTIVE_NODE_CONFIGURED"]
             )
+            SharedTunnelLogger.log("No active node configured in shared store", tag: "ERROR")
             completionHandler(err)
             return
         }
+
+        SharedTunnelLogger.log("Starting VPN session for \(activeNode.remark) (\(activeNode.serverHost):\(activeNode.serverPort))", tag: "TUNNEL")
 
         telemetryLock.withLock {
             self.activeNodeId = activeNode.id
@@ -63,6 +66,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                 code: 500,
                 userInfo: [NSLocalizedDescriptionKey: "CORE_CONFIG_SERIALIZATION_FAILED"]
             )
+            SharedTunnelLogger.log("Failed to serialize core configuration", tag: "ERROR")
             completionHandler(err)
             return
         }
@@ -71,6 +75,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
         let coreResult = self.coreController.startCore(configData: coreConfigData)
         if case .failure(let coreErr) = coreResult {
             self.logger.error("NORTHY // Proxy core failed to launch: \(coreErr.localizedDescription)")
+            SharedTunnelLogger.log("Proxy core failed to launch: \(coreErr.localizedDescription)", tag: "ERROR")
             completionHandler(coreErr)
             return
         }
@@ -87,6 +92,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             guard let self else { return }
             if let error {
                 self.logger.error("NORTHY // Failed to apply tunnel network settings: \(error.localizedDescription)")
+                SharedTunnelLogger.log("Failed to apply tunnel network settings: \(error.localizedDescription)", tag: "ERROR")
                 self.coreController.stopCore()
                 startCompletion(error)
                 return
@@ -99,6 +105,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             // 3. Launch High-Throughput Stateful TUN Packet Flow Bridge
             self.startPacketFlowBridge(connectionConfig: connectionConfig)
 
+            SharedTunnelLogger.log("Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU), TUN 198.18.0.1/15, DNS 198.18.0.2]", tag: "TUNNEL")
             self.logger.notice("NORTHY // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
             startCompletion(nil)
         }
@@ -108,6 +115,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
     public override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         logger.notice("NORTHY // Stopping tunnel (reason: \(String(describing: reason)))")
+        SharedTunnelLogger.log("Stopping tunnel (reason code: \(reason.rawValue))", tag: "TUNNEL")
 
         heartbeatTask?.cancel()
         heartbeatTask = nil
@@ -274,8 +282,9 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
         settings.ipv4Settings = ipv4Settings
 
-        // Virtual IPv6 routing: fd00::1/126
-        if routing.enableIPv6Routing && connection.tunnelMode == .tun {
+        // Virtual IPv6 routing: fd00::1/126 (RFC 4193 Unique Local Address)
+        // Configure default IPv6 route in tun mode to prevent dual-stack IPv6 traffic from leaking outside the tunnel
+        if connection.tunnelMode == .tun {
             let ipv6Settings = NEIPv6Settings(
                 addresses: ["fd00::1"],
                 networkPrefixLengths: [126]

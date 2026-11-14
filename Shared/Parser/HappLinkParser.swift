@@ -927,19 +927,10 @@ public struct HappLinkParser: Sendable {
             ]
         ]
 
-        if connection.tunnelMode == .tun {
-            inbounds.insert([
-                "tag": "tun-in",
-                "protocol": "tun",
-                "settings": [
-                    "name": "utun99",
-                    "MTU": connection.tunMTU,
-                    "autoRoute": true,
-                    "strictRoute": false
-                ],
-                "sniffing": sniffingConfig
-            ], at: 0)
-        }
+        // Note: On iOS, NetworkExtension cannot allocate raw utun devices (/dev/utun99).
+        // Packet interception is handled natively via NEPacketTunnelFlow and TUNPacketBridge,
+        // which transparently bridges all device IP traffic to SOCKS5 (10808) and DNS (10853).
+        // Removing the invalid "protocol": "tun" prevents LibXray failure on sandboxed iOS.
 
         // Outbounds (Proxy + Mux + Fragment + Direct + Block + DNS Outbound)
         var proxyOutbound: [String: Any] = [

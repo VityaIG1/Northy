@@ -65,12 +65,23 @@ public final class ProxyCoreController: @unchecked Sendable {
         let result = LibXrayRunXrayFromJSON(jsonString)
         if let resultString = result as? String, !resultString.isEmpty && resultString != "OK" {
             logger.error("NORTHY // LibXrayRunXrayFromJSON returned error: \(resultString)")
+            SharedTunnelLogger.log("LibXray error: \(resultString)", tag: "ERROR")
             lock.withLock { self.lastErrorMessage = resultString }
+            return .failure(NSError(domain: "com.scrt.north.core", code: 500, userInfo: [NSLocalizedDescriptionKey: resultString]))
         }
         #endif
 
         // 2. Dynamic runtime symbol lookup (for dynamically linked LibXray / Libbox frameworks)
-        invokeDynamicCoreStart(jsonString: jsonString)
+        if let dynError = invokeDynamicCoreStart(jsonString: jsonString) {
+            logger.error("NORTHY // Dynamic core start returned error: \(dynError)")
+            SharedTunnelLogger.log("Dynamic core start error: \(dynError)", tag: "ERROR")
+            lock.withLock { self.lastErrorMessage = dynError }
+            return .failure(NSError(domain: "com.scrt.north.core", code: 500, userInfo: [NSLocalizedDescriptionKey: dynError]))
+        }
+
+        // 3. Verify local SOCKS5 core readiness on 127.0.0.1:10808
+        let isReady = waitForCoreReady(port: 10808, timeoutMs: 800)
+        SharedTunnelLogger.log(isReady ? "Proxy core SOCKS5 listener active on 127.0.0.1:10808" : "Proxy core initialized (readiness check timed out, continuing)", tag: "CORE")
 
         lock.withLock {
             self.isCoreRunning = true
@@ -97,6 +108,7 @@ public final class ProxyCoreController: @unchecked Sendable {
             lastErrorMessage = nil
         }
 
+        SharedTunnelLogger.log("Proxy core terminated and memory released", tag: "CORE")
         logger.notice("NORTHY // Proxy Core terminated and memory released")
     }
 
@@ -111,19 +123,26 @@ public final class ProxyCoreController: @unchecked Sendable {
 
     // MARK: - Dynamic Symbol Resolution (LibXray / sing-box / Libbox)
 
-    private func invokeDynamicCoreStart(jsonString: String) {
+    @discardableResult
+    private func invokeDynamicCoreStart(jsonString: String) -> String? {
         #if canImport(Darwin)
-        guard let handle = dlopen(nil, RTLD_NOW) else { return }
+        guard let handle = dlopen(nil, RTLD_NOW) else { return nil }
         defer { dlclose(handle) }
 
         // Try LibXrayRunXrayFromJSON: char* LibXrayRunXrayFromJSON(char*)
         if let sym = dlsym(handle, "LibXrayRunXrayFromJSON") {
             typealias RunFunc = @convention(c) (UnsafePointer<CChar>) -> UnsafePointer<CChar>?
             let fn = unsafeBitCast(sym, to: RunFunc.self)
-            jsonString.withCString { cstr in
-                _ = fn(cstr)
+            let resultPtr = jsonString.withCString { cstr in
+                fn(cstr)
             }
-            return
+            if let resultPtr = resultPtr {
+                let res = String(cString: resultPtr)
+                if !res.isEmpty && res != "OK" {
+                    return res
+                }
+            }
+            return nil
         }
 
         // Try LibboxNewService: if sing-box is linked
@@ -131,6 +150,52 @@ public final class ProxyCoreController: @unchecked Sendable {
             logger.notice("NORTHY // Found LibboxNewService dynamically")
         }
         #endif
+        return nil
+    }
+
+    private func waitForCoreReady(port: Int = 10808, timeoutMs: Int = 800) -> Bool {
+        #if canImport(Darwin)
+        let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
+        while Date() < deadline {
+            let sock = socket(AF_INET, SOCK_STREAM, 0)
+            if sock >= 0 {
+                var addr = sockaddr_in()
+                addr.sin_family = sa_family_t(AF_INET)
+                addr.sin_port = UInt16(port).bigEndian
+                inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+
+                let flags = fcntl(sock, F_GETFL, 0)
+                _ = fcntl(sock, F_SETFL, flags | O_NONBLOCK)
+
+                let res = withUnsafePointer(to: &addr) {
+                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                        connect(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    }
+                }
+
+                if res == 0 {
+                    close(sock)
+                    return true
+                } else if errno == EINPROGRESS {
+                    var pfd = pollfd(fd: sock, events: Int16(POLLOUT), revents: 0)
+                    let pollRes = poll(&pfd, 1, 50)
+                    if pollRes > 0 && (pfd.revents & Int16(POLLOUT)) != 0 {
+                        var err: Int32 = 0
+                        var len = socklen_t(MemoryLayout<Int32>.size)
+                        getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len)
+                        close(sock)
+                        if err == 0 { return true }
+                    } else {
+                        close(sock)
+                    }
+                } else {
+                    close(sock)
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        #endif
+        return false
     }
 
     private func invokeDynamicCoreStop() {

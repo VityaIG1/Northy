@@ -397,6 +397,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
                         self.connectToSocksUpstream(state: state, retryCount: retryCount + 1)
                     }
                 } else {
+                    SharedTunnelLogger.log("SOCKS5 upstream connect failed on 127.0.0.1:\(self.socksPort)", tag: "BRIDGE")
                     self.closeTCPConnection(key: state.key)
                 }
             case .cancelled:
@@ -434,8 +435,11 @@ public final class TUNPacketBridge: @unchecked Sendable {
                         return
                     }
 
-                    upstream.receive(minimumIncompleteLength: 10, maximumLength: 10) { connResp, _, _, respErr in
+                    upstream.receive(minimumIncompleteLength: 4, maximumLength: 512) { connResp, _, _, respErr in
                         guard let connResp, connResp.count >= 4, connResp[1] == 0x00, respErr == nil, !state.isClosed else {
+                            if let connResp, connResp.count >= 2 {
+                                SharedTunnelLogger.log("SOCKS5 rejected target with code \(connResp[1])", tag: "SOCKS")
+                            }
                             upstream.cancel()
                             return
                         }

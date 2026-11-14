@@ -402,7 +402,7 @@ public enum SubscriptionUserAgentProfile: String, Codable, CaseIterable, Sendabl
     case incyDefault = "Incy/1.0.0/ios"
     case incyLegacy = "Incy/0.9.8/ios"
     case happDefault = "Happ/3.0.0/ios"
-    case happLegacy = "Happ/0.3.0 (iOS; Northy)"
+    case happLegacy = "Happ/0.4.0 (iOS; Northy)"
     case v2rayNG = "v2rayNG/1.8.23"
     case clashMeta = "ClashMetaForAndroid/2.10.1"
     case singBox = "SFI/1.10.0 (iOS; sing-box 1.10.0)"

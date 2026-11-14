@@ -8,7 +8,7 @@
 - **Extension ID:** `com.scrt.north.PacketTunnel`
 - **App Group:** `group.com.scrt.north`
 - **Team ID:** `NORTHVPN99`
-- **Версия:** `0.3.0 (Build 3)`
+- **Версия:** `0.4.0 (Build 4)`
 
 ## Особенности
 
@@ -45,7 +45,7 @@
 3. **Сборка и скачивание подписанного IPA:**
    - Перейдите во вкладку **Actions** в репозитории на GitHub.
    - Выберите воркфлоу **Build Northy IPA** (запускается автоматически при пуше или кнопкой **Run workflow**).
-   - По завершении сборки скачайте готовый подписанный архив в секции **Artifacts** (`Northy-v0.3.0-signed-ipa`).
+   - По завершении сборки скачайте готовый подписанный архив в секции **Artifacts** (`Northy-v0.4.0-signed-ipa`).
 
 ### Установка на устройство:
 - **TrollStore:** Устанавливает напрямую без переподписи, сохраняя все entitlements туннеля.
@@ -62,4 +62,4 @@ chmod +x scripts/build_ipa.sh
 ./scripts/build_ipa.sh
 ```
 
-Готовый файл появится в `build/Northy-v0.3.0-signed.ipa` и `build/Northy.ipa`.
+Готовый файл появится в `build/Northy-v0.4.0-signed.ipa` и `build/Northy.ipa`.

@@ -22,6 +22,12 @@ public struct ServersView: View {
     @State private var refreshingSubId: UUID? = nil
     @State private var pingingSubId: UUID? = nil
 
+    // Header Tap & Secret Diagnostics
+    @State private var headerTapCount: Int = 0
+    @State private var lastHeaderTapTime: Date = .distantPast
+    @State private var isHeaderBouncing: Bool = false
+    @State private var showSecretDiagnostics: Bool = false
+
     public init(
         vpnManager: VPNTunnelManager,
         localization: LocalizationManager,
@@ -61,30 +67,59 @@ public struct ServersView: View {
         .background(NothingPalette.trueBlack)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 4) {
-                    NothingDotMatrixLabel(
-                        text: "NORTHY",
-                        dotSize: 2.2,
-                        spacing: 1.0,
-                        activeColor: NothingPalette.pureWhite
-                    )
+                Button {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
 
-                    TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
-                        NothingDotMatrixLabel(
-                            text: Self.formatUptime(
-                                since: vpnManager.connectedSince,
-                                now: ctx.date,
-                                isConnected: vpnManager.isConnected
-                            ),
-                            dotSize: 1.8,
-                            spacing: 0.8,
-                            activeColor: vpnManager.isConnected
-                                ? theme.accentColor
-                                : NothingPalette.mutedGrey.opacity(0.6)
-                        )
+                    withAnimation(.spring(response: 0.12, dampingFraction: 0.6)) {
+                        isHeaderBouncing = true
                     }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        withAnimation(.spring(response: 0.18, dampingFraction: 0.75)) {
+                            isHeaderBouncing = false
+                        }
+                    }
+
+                    let now = Date()
+                    if now.timeIntervalSince(lastHeaderTapTime) > 1.5 {
+                        headerTapCount = 0
+                    }
+                    lastHeaderTapTime = now
+                    headerTapCount += 1
+
+                    if headerTapCount >= 8 {
+                        headerTapCount = 0
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        showSecretDiagnostics = true
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        NothingDotMatrixLabel(
+                            text: "NORTHY",
+                            dotSize: 2.2,
+                            spacing: 1.0,
+                            activeColor: NothingPalette.pureWhite
+                        )
+
+                        TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
+                            NothingDotMatrixLabel(
+                                text: Self.formatUptime(
+                                    since: vpnManager.connectedSince,
+                                    now: ctx.date,
+                                    isConnected: vpnManager.isConnected
+                                ),
+                                dotSize: 1.8,
+                                spacing: 0.8,
+                                activeColor: vpnManager.isConnected
+                                    ? theme.accentColor
+                                    : NothingPalette.mutedGrey.opacity(0.6)
+                            )
+                        }
+                    }
+                    .padding(.top, 2)
+                    .scaleEffect(isHeaderBouncing ? 1.12 : 1.0)
                 }
-                .padding(.top, 2)
+                .buttonStyle(.plain)
             }
 
             ToolbarItem(placement: .topBarTrailing) {
@@ -102,6 +137,9 @@ public struct ServersView: View {
         .sensoryFeedback(.impact(flexibility: .solid, intensity: 0.8), trigger: vpnManager.isConnected)
         .sheet(isPresented: $showAddSubscriptionSheet) {
             AddSubscriptionSheet(vpnManager: vpnManager, localization: localization)
+        }
+        .sheet(isPresented: $showSecretDiagnostics) {
+            TunnelDiagnosticsSheet(vpnManager: vpnManager, localization: localization)
         }
         .sheet(item: $selectedSubscriptionForDetails) { sub in
             SubscriptionDetailsSheet(subscription: sub, vpnManager: vpnManager, localization: localization)
@@ -126,8 +164,8 @@ public struct ServersView: View {
             .frame(height: 28)
             .padding(.horizontal, 20)
 
-            // Nothing OS 360° Dot-Matrix Radar Connect Button
-            NothingRadarConnectButton(
+            // Nothing OS Concentric Dot-Matrix Power Connect Button
+            NothingPowerConnectButton(
                 isConnected: vpnManager.isConnected,
                 isTransitioning: vpnManager.isTransitioning,
                 accentColor: theme.accentColor
@@ -136,7 +174,7 @@ public struct ServersView: View {
                     await vpnManager.toggleTunnelConnection()
                 }
             }
-            .frame(height: 184)
+            .frame(height: 208)
 
             // Active Node & Status Headline Label
             VStack(spacing: 4) {
@@ -254,6 +292,8 @@ public struct ServersView: View {
                     .font(NothingTypography.technicalMono(size: 13, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(isActive ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
+                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.28, dampingFraction: 0.75), value: value)
                     .lineLimit(1)
             }
 
@@ -319,7 +359,7 @@ public struct ServersView: View {
                 HStack(alignment: .top, spacing: 10) {
                     // Collapse Chevron Button
                     Button {
-                        withAnimation(.snappy(duration: 0.2)) {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
                             if isCollapsed {
                                 collapsedSubscriptionIds.remove(sub.id)
                             } else {
@@ -389,9 +429,10 @@ public struct ServersView: View {
                                 pingingSubId = nil
                             }
                         } label: {
-                            Image(systemName: "gauge.with.dots.needle.33percent")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(pingingSubId == sub.id ? theme.accentColor : NothingPalette.pureWhite)
+                            RotatingPingIcon(
+                                isRotating: pingingSubId == sub.id || vpnManager.isPingingAll,
+                                color: (pingingSubId == sub.id || vpnManager.isPingingAll) ? theme.accentColor : NothingPalette.pureWhite
+                            )
                         }
                         .buttonStyle(.plain)
 
@@ -546,7 +587,9 @@ public struct ServersView: View {
         let cleanedRemark = Self.cleanNodeRemark(node.remark)
 
         return Button {
-            vpnManager.selectNode(node.id)
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                vpnManager.selectNode(node.id)
+            }
         } label: {
             HStack(spacing: 8) {
                 // Nothing OS Dot-Matrix Country Code Badge (e.g. [DE], [US], [FI])
@@ -1362,6 +1405,46 @@ public struct EditSubscriptionSheet: View {
                 titleInput = subscription.title
                 intervalSelection = subscription.updateIntervalHours ?? 6
             }
+        }
+    }
+}
+
+// MARK: - Rotating Ping Indicator Icon
+
+private struct RotatingPingIcon: View {
+    let isRotating: Bool
+    let color: Color
+    @State private var rotationAngle: Double = 0
+
+    var body: some View {
+        Image(systemName: "gauge.with.dots.needle.33percent")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(color)
+            .rotationEffect(.degrees(rotationAngle))
+            .onAppear {
+                if isRotating {
+                    startRotation()
+                }
+            }
+            .onChange(of: isRotating) { _, rotating in
+                if rotating {
+                    startRotation()
+                } else {
+                    stopRotation()
+                }
+            }
+    }
+
+    private func startRotation() {
+        rotationAngle = 0
+        withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
+            rotationAngle = 360
+        }
+    }
+
+    private func stopRotation() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            rotationAngle = 0
         }
     }
 }
