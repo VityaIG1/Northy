@@ -821,9 +821,14 @@ public struct ServersView: View {
     // MARK: - Static Formatting Utilities
 
     public static func countryFlagOrIcon(for remark: String) -> String {
-        for scalar in remark.unicodeScalars {
-            if scalar.properties.isEmoji && (0x1F1E6...0x1F1FF).contains(scalar.value) {
-                return String(remark.filter { $0.isEmoji })
+        for char in remark {
+            if char.unicodeScalars.contains(where: { (0x1F1E6...0x1F1FF).contains($0.value) }) {
+                return String(char)
+            }
+        }
+        for char in remark {
+            if char.isEmoji {
+                return String(char)
             }
         }
         let upper = remark.uppercased()
@@ -1359,6 +1364,16 @@ public struct EditSubscriptionSheet: View {
                 titleInput = subscription.title
                 intervalSelection = subscription.updateIntervalHours ?? 6
             }
+        }
+    }
+}
+
+// MARK: - Character Emoji Helper
+
+extension Character {
+    fileprivate var isEmoji: Bool {
+        unicodeScalars.contains { scalar in
+            scalar.properties.isEmoji && (scalar.value > 0x2388 || scalar.properties.isEmojiPresentation)
         }
     }
 }

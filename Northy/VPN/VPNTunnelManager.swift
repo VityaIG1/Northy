@@ -499,8 +499,7 @@ public final class VPNTunnelManager {
 
     private func restartTunnelWithActiveNode() async {
         guard let node = selectedNode else { return }
-        isTransitioning = true
-        defer { isTransitioning = false }
+        connectionStatus = .reasserting
 
         providerManager?.connection.stopVPNTunnel()
 
