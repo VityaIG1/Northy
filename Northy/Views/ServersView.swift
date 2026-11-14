@@ -566,12 +566,6 @@ public struct ServersView: View {
 
         return Button {
             vpnManager.selectNode(node.id)
-            if vpnManager.isConnected {
-                Task {
-                    await vpnManager.toggleTunnelConnection()
-                    await vpnManager.toggleTunnelConnection()
-                }
-            }
         } label: {
             HStack(spacing: 10) {
                 // Country Flag or Globe Icon

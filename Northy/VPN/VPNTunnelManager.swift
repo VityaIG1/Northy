@@ -498,9 +498,35 @@ public final class VPNTunnelManager {
     }
 
     private func restartTunnelWithActiveNode() async {
+        guard let node = selectedNode else { return }
+        isTransitioning = true
+        defer { isTransitioning = false }
+
         providerManager?.connection.stopVPNTunnel()
-        try? await Task.sleep(for: .milliseconds(350))
-        await toggleTunnelConnection()
+
+        for _ in 0..<20 {
+            if providerManager?.connection.status == .disconnected || providerManager?.connection.status == .invalid {
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        do {
+            let coreJSONData = try HappLinkParser.buildXrayCoreConfiguration(
+                for: node,
+                routing: routingConfig,
+                connection: connectionSettings
+            )
+            SharedTunnelStore.shared.writeActiveCoreConfiguration(coreJSONData)
+
+            let manager = try await ensureTunnelManagerConfigured(for: node, coreJSONData: coreJSONData)
+            try manager.connection.startVPNTunnel()
+            connectionStatus = .connecting
+            statusBannerMessage = "SWITCHED TO // \(node.remark)"
+        } catch {
+            connectionStatus = .disconnected
+            statusBannerMessage = "TUNNEL SWITCH ERROR // \(error.localizedDescription.uppercased())"
+        }
     }
 
     private func bootstrapProviderManager() async {

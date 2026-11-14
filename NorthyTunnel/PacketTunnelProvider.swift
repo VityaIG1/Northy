@@ -67,7 +67,15 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             return
         }
 
-        // Configure virtual TUN network settings
+        // 1. Launch Real Proxy Core (Xray-core / LibXray / sing-box) and fail-fast if config or core fails
+        let coreResult = self.coreController.startCore(configData: coreConfigData)
+        if case .failure(let coreErr) = coreResult {
+            self.logger.error("NORTHY // Proxy core failed to launch: \(coreErr.localizedDescription)")
+            completionHandler(coreErr)
+            return
+        }
+
+        // 2. Configure virtual TUN network settings
         let networkSettings = buildTunnelNetworkSettings(
             for: activeNode,
             routing: routingConfig,
@@ -79,6 +87,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             guard let self else { return }
             if let error {
                 self.logger.error("NORTHY // Failed to apply tunnel network settings: \(error.localizedDescription)")
+                self.coreController.stopCore()
                 startCompletion(error)
                 return
             }
@@ -87,13 +96,7 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
                 self.connectedAt = .now
             }
 
-            // Launch Real Proxy Core (Xray-core / LibXray / sing-box)
-            let coreResult = self.coreController.startCore(configData: coreConfigData)
-            if case .failure(let coreErr) = coreResult {
-                self.logger.warning("NORTHY // Warning starting proxy core: \(coreErr.localizedDescription)")
-            }
-
-            // Launch High-Throughput TUN Packet Flow Bridge
+            // 3. Launch High-Throughput Stateful TUN Packet Flow Bridge
             self.startPacketFlowBridge(connectionConfig: connectionConfig)
 
             self.logger.notice("NORTHY // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
@@ -235,22 +238,19 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             }
         }
 
-        // 3. Exclude DNS resolver IPs so bootstrap resolution proceeds directly
-        for dnsServer in routing.dnsProvider.resolverAddresses {
-            if Self.isIPv4Address(dnsServer) {
-                excludedRoutes.append(NEIPv4Route(destinationAddress: dnsServer, subnetMask: "255.255.255.255"))
-            }
-        }
+        // Configure system proxy settings for instant WebKit / Safari / URLSession routing through local core
+        let proxySettings = NEProxySettings()
+        proxySettings.httpEnabled = true
+        proxySettings.httpServer = NEProxyServer(address: "127.0.0.1", port: 10809)
+        proxySettings.httpsEnabled = true
+        proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 10809)
+        proxySettings.excludeSimpleHostnames = false
+        proxySettings.matchDomains = [""]
+        settings.proxySettings = proxySettings
 
         if connection.tunnelMode == .proxyOnly {
-            let proxySettings = NEProxySettings()
-            proxySettings.httpEnabled = true
-            proxySettings.httpServer = NEProxyServer(address: "127.0.0.1", port: 10809)
-            proxySettings.httpsEnabled = true
-            proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 10809)
-            proxySettings.excludeSimpleHostnames = true
-            settings.proxySettings = proxySettings
             ipv4Settings.includedRoutes = []
+            ipv4Settings.excludedRoutes = []
         } else {
             switch routing.routingMode {
             case .globalTunnel:
