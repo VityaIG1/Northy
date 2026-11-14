@@ -10,7 +10,7 @@ public final class SharedTunnelLogger: @unchecked Sendable {
     private static let systemLogger = Logger(subsystem: "com.scrt.north", category: "Diagnostics")
 
     // In-memory ring buffer to ensure logs are never lost even if container is sandboxed or unmounted
-    private static var inMemoryRingBuffer: [String] = []
+    nonisolated(unsafe) private static var inMemoryRingBuffer: [String] = []
 
     public static var logFileURL: URL {
         if let shared = SharedTunnelStore.sharedContainerURL {

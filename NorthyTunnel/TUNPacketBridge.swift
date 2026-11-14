@@ -404,7 +404,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let upstream = NWConnection(to: socksEndpoint, using: tcpParams)
         state.upstream = upstream
 
-        upstream.stateUpdateHandler = { [weak self, weak state] status in
+        upstream.stateUpdateHandler = { [weak self, weak state] (status: NWConnection.State) in
             guard let self, let state, !state.isClosed else { return }
             switch status {
             case .ready:
@@ -430,8 +430,8 @@ public final class TUNPacketBridge: @unchecked Sendable {
     private func connectDirectOrVlessUpstream(state: TCPConnectionState) {
         guard !state.isClosed else { return }
 
-        // If active node is VLESS with valid host and UUID, attempt VLESS tunnel
-        if let node = activeNode, node.protocolType == .vless, !node.serverHost.isEmpty, node.serverPort > 0, let uuid = UUID(uuidString: node.uuid) {
+        // If active node is VLESS with valid host and credential UUID, attempt VLESS tunnel
+        if let node = activeNode, node.protocolType == .vless, !node.serverHost.isEmpty, node.serverPort > 0, let uuid = UUID(uuidString: node.credential) {
             connectViaVLESS(state: state, node: node, uuid: uuid)
             return
         }
@@ -443,11 +443,11 @@ public final class TUNPacketBridge: @unchecked Sendable {
     private func connectViaVLESS(state: TCPConnectionState, node: ProxyNode, uuid: UUID) {
         let endpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host(node.serverHost),
-            port: NWEndpoint.Port(rawValue: node.serverPort) ?? 443
+            port: NWEndpoint.Port(rawValue: UInt16(clamping: node.serverPort)) ?? 443
         )
 
         let params: NWParameters
-        if node.tlsSecurity == .tls || node.tlsSecurity == .reality {
+        if node.security == .tls || node.security == .reality {
             let tlsOptions = NWProtocolTLS.Options()
             let sni = node.sni ?? node.serverHost
             sec_protocol_options_set_tls_server_name(tlsOptions.securityProtocolOptions, sni)
@@ -459,7 +459,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let upstream = NWConnection(to: endpoint, using: params)
         state.upstream = upstream
 
-        upstream.stateUpdateHandler = { [weak self, weak state] status in
+        upstream.stateUpdateHandler = { [weak self, weak state] (status: NWConnection.State) in
             guard let self, let state, !state.isClosed else { return }
             switch status {
             case .ready:
@@ -530,7 +530,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let upstream = NWConnection(to: endpoint, using: .tcp)
         state.upstream = upstream
 
-        upstream.stateUpdateHandler = { [weak self, weak state] status in
+        upstream.stateUpdateHandler = { [weak self, weak state] (status: NWConnection.State) in
             guard let self, let state, !state.isClosed else { return }
             switch status {
             case .ready:
@@ -764,7 +764,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
                 }
             }
 
-            connection.stateUpdateHandler = { [weak self] state in
+            connection.stateUpdateHandler = { [weak self] (state: NWConnection.State) in
                 guard let self else { return }
                 switch state {
                 case .ready:
@@ -827,7 +827,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let connection = NWConnection(to: endpoint, using: .udp)
         let queue = DispatchQueue(label: "northy.dns.fb.\(clientPort)")
 
-        connection.stateUpdateHandler = { [weak self] state in
+        connection.stateUpdateHandler = { [weak self] (state: NWConnection.State) in
             guard let self else { return }
             if state == .ready {
                 connection.send(content: queryPayload, completion: .contentProcessed({ err in
@@ -873,7 +873,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let connection = NWConnection(to: endpoint, using: .udp)
         let queue = DispatchQueue(label: "northy.udp.\(srcPort)")
 
-        connection.stateUpdateHandler = { [weak self] state in
+        connection.stateUpdateHandler = { [weak self] (state: NWConnection.State) in
             guard let self else { return }
             if state == .ready {
                 connection.send(content: payload, completion: .contentProcessed({ err in
