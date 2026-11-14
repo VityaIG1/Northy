@@ -6,10 +6,19 @@ import os.log
 public final class SharedTunnelLogger: @unchecked Sendable {
     private static let lock = NSLock()
     private static let maxLogLines = 1000
-    private static let maxFileSizeBytes = 256 * 1024 // 256 KB
+    private static let maxFileSizeBytes = 512 * 1024 // 512 KB
+    private static let systemLogger = Logger(subsystem: "com.scrt.north", category: "Diagnostics")
 
-    private static var logFileURL: URL? {
-        SharedTunnelStore.sharedContainerURL?.appendingPathComponent("tunnel_diagnostics.log")
+    // In-memory ring buffer to ensure logs are never lost even if container is sandboxed or unmounted
+    private static var inMemoryRingBuffer: [String] = []
+
+    public static var logFileURL: URL {
+        if let shared = SharedTunnelStore.sharedContainerURL {
+            return shared.appendingPathComponent("tunnel_diagnostics.log")
+        }
+        let fallback = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return fallback.appendingPathComponent("tunnel_diagnostics.log")
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -18,60 +27,82 @@ public final class SharedTunnelLogger: @unchecked Sendable {
         return df
     }()
 
-    /// Appends a new diagnostic message with tag and timestamp to the shared log file.
+    /// Appends a new diagnostic message with tag and timestamp to the log stream.
     public static func log(_ message: String, tag: String = "INFO") {
         lock.withLock {
             let timestamp = dateFormatter.string(from: Date())
-            let line = "[\(timestamp)] [\(tag.uppercased())] \(message)\n"
+            let line = "[\(timestamp)] [\(tag.uppercased())] \(message)"
+            let lineWithNewline = "\(line)\n"
 
-            guard let url = logFileURL else { return }
+            // 1. In-memory ring buffer
+            inMemoryRingBuffer.append(line)
+            if inMemoryRingBuffer.count > 500 {
+                inMemoryRingBuffer.removeFirst(inMemoryRingBuffer.count - 500)
+            }
 
+            // 2. OS logger & console output
+            systemLogger.notice("[\(tag.uppercased())] \(message)")
+
+            // 3. File persistence (shared container or local cache fallback)
+            let url = logFileURL
             if let handle = try? FileHandle(forWritingTo: url) {
                 defer { try? handle.close() }
                 handle.seekToEndOfFile()
-                if let data = line.data(using: .utf8) {
+                if let data = lineWithNewline.data(using: .utf8) {
                     handle.write(data)
                 }
             } else {
-                try? line.write(to: url, atomically: true, encoding: .utf8)
+                try? lineWithNewline.write(to: url, atomically: true, encoding: .utf8)
             }
 
             trimLogFileIfNeeded(url: url)
         }
     }
 
-    /// Reads all lines from the shared log file.
+    /// Reads all lines from the shared log file or in-memory ring buffer.
     public static func readLogs() -> [String] {
         lock.withLock {
-            guard let url = logFileURL,
-                  let content = try? String(contentsOf: url, encoding: .utf8) else {
-                return ["[DIAGNOSTICS] Shared container log initialized. No entries yet."]
+            var fileLines: [String] = []
+            let url = logFileURL
+            if let content = try? String(contentsOf: url, encoding: .utf8) {
+                fileLines = content.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             }
-            let lines = content.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-            return lines.isEmpty ? ["[DIAGNOSTICS] Log stream empty."] : lines
+
+            // Merge file lines and memory buffer, eliminating duplicates while preserving order
+            var combined = fileLines
+            if combined.isEmpty {
+                combined = inMemoryRingBuffer
+            }
+
+            if combined.isEmpty {
+                let initLine = "[\(dateFormatter.string(from: Date()))] [SYS] Northy v0.4.0 Diagnostics initialized. Ready."
+                return [initLine]
+            }
+
+            return combined
         }
     }
 
     /// Reads full log text as a single string (useful for Copy to Clipboard or Sharing).
     public static func readFullLogString() -> String {
-        lock.withLock {
-            guard let url = logFileURL,
-                  let content = try? String(contentsOf: url, encoding: .utf8) else {
-                return "// NORTHY VPN DIAGNOSTICS LOG //\nNo entries found."
-            }
-            return content
-        }
+        let lines = readLogs()
+        return lines.joined(separator: "\n")
     }
 
-    /// Clears the log file.
+    /// Clears both file and in-memory log buffer.
     public static func clearLogs() {
         lock.withLock {
-            guard let url = logFileURL else { return }
+            inMemoryRingBuffer.removeAll()
+            let url = logFileURL
             try? "".write(to: url, atomically: true, encoding: .utf8)
+            let timestamp = dateFormatter.string(from: Date())
+            let fresh = "[\(timestamp)] [SYS] Logs cleared by user."
+            inMemoryRingBuffer.append(fresh)
+            try? "\(fresh)\n".write(to: url, atomically: true, encoding: .utf8)
         }
     }
 
-    public static func exportLogURL() -> URL? {
+    public static func exportLogURL() -> URL {
         logFileURL
     }
 

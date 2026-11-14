@@ -103,7 +103,11 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             }
 
             // 3. Launch High-Throughput Stateful TUN Packet Flow Bridge
-            self.startPacketFlowBridge(connectionConfig: connectionConfig)
+            self.startPacketFlowBridge(
+                activeNode: activeNode,
+                routingConfig: routingConfig,
+                connectionConfig: connectionConfig
+            )
 
             SharedTunnelLogger.log("Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU), TUN 198.18.0.1/15, DNS 198.18.0.2]", tag: "TUNNEL")
             self.logger.notice("NORTHY // Tunnel established -> \(activeNode.serverHost):\(activeNode.serverPort) [MTU \(connectionConfig.tunMTU)]")
@@ -246,15 +250,19 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
             }
         }
 
-        // Configure system proxy settings for instant WebKit / Safari / URLSession routing through local core
-        let proxySettings = NEProxySettings()
-        proxySettings.httpEnabled = true
-        proxySettings.httpServer = NEProxyServer(address: "127.0.0.1", port: 10809)
-        proxySettings.httpsEnabled = true
-        proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 10809)
-        proxySettings.excludeSimpleHostnames = false
-        proxySettings.matchDomains = [""]
-        settings.proxySettings = proxySettings
+        // Configure system proxy settings ONLY if local HTTP proxy core is actively listening on 10809
+        if coreController.isHttpProxyReady {
+            let proxySettings = NEProxySettings()
+            proxySettings.httpEnabled = true
+            proxySettings.httpServer = NEProxyServer(address: "127.0.0.1", port: 10809)
+            proxySettings.httpsEnabled = true
+            proxySettings.httpsServer = NEProxyServer(address: "127.0.0.1", port: 10809)
+            proxySettings.excludeSimpleHostnames = false
+            proxySettings.matchDomains = [""]
+            settings.proxySettings = proxySettings
+        } else {
+            settings.proxySettings = nil
+        }
 
         if connection.tunnelMode == .proxyOnly {
             ipv4Settings.includedRoutes = []
@@ -317,13 +325,19 @@ public final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Send
 
     // MARK: - Packet Flow Bridge & Telemetry Heartbeat
 
-    private func startPacketFlowBridge(connectionConfig: HappConnectionSettings) {
+    private func startPacketFlowBridge(
+        activeNode: ProxyNode,
+        routingConfig: TunnelRoutingConfiguration,
+        connectionConfig: HappConnectionSettings
+    ) {
         heartbeatTask?.cancel()
         tunBridge?.stop()
 
-        // 1. Initialize and start the TUN Packet Bridge (bridges packetFlow to local core SOCKS5 & DNS)
+        // 1. Initialize and start the TUN Packet Bridge (bridges packetFlow to local core SOCKS5, native proxy or direct fallback)
         let bridge = TUNPacketBridge(
             packetFlow: packetFlow,
+            activeNode: activeNode,
+            routingConfig: routingConfig,
             socksHost: "127.0.0.1",
             socksPort: 10808,
             dnsHost: "127.0.0.1",

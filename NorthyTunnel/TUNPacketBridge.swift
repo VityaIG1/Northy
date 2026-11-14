@@ -13,6 +13,8 @@ public final class TUNPacketBridge: @unchecked Sendable {
 
     private let logger = Logger(subsystem: "com.scrt.north.PacketTunnel", category: "TUNBridge")
     private let packetFlow: NEPacketTunnelFlow
+    private let activeNode: ProxyNode?
+    private let routingConfig: TunnelRoutingConfiguration?
     private let socksHost: String
     private let socksPort: UInt16
     private let dnsHost: String
@@ -34,12 +36,16 @@ public final class TUNPacketBridge: @unchecked Sendable {
 
     public init(
         packetFlow: NEPacketTunnelFlow,
+        activeNode: ProxyNode? = nil,
+        routingConfig: TunnelRoutingConfiguration? = nil,
         socksHost: String = "127.0.0.1",
         socksPort: UInt16 = 10808,
         dnsHost: String = "127.0.0.1",
         dnsPort: UInt16 = 10853
     ) {
         self.packetFlow = packetFlow
+        self.activeNode = activeNode
+        self.routingConfig = routingConfig
         self.socksHost = socksHost
         self.socksPort = socksPort
         self.dnsHost = dnsHost
@@ -371,8 +377,20 @@ public final class TUNPacketBridge: @unchecked Sendable {
             state.serverSeq &+= 1
         }
 
-        // 2. Connect to local proxy core SOCKS5 inbound (127.0.0.1:10808)
-        connectToSocksUpstream(state: state)
+        // 2. Connect to upstream (SOCKS5 if active, or native proxy, or direct fallback)
+        connectToUpstream(state: state)
+    }
+
+    private func connectToUpstream(state: TCPConnectionState) {
+        guard !state.isClosed else { return }
+
+        // Check if local SOCKS5 core is available on 127.0.0.1:10808
+        if ProxyCoreController.isPortListening(port: Int(socksPort), timeoutMs: 25) {
+            connectToSocksUpstream(state: state)
+        } else {
+            // SOCKS5 core inactive: route via VLESS or direct TCP relay
+            connectDirectOrVlessUpstream(state: state)
+        }
     }
 
     private func connectToSocksUpstream(state: TCPConnectionState, retryCount: Int = 0) {
@@ -392,21 +410,167 @@ public final class TUNPacketBridge: @unchecked Sendable {
             case .ready:
                 self.performSOCKS5Handshake(state: state, upstream: upstream)
             case .failed:
-                if retryCount < 2 {
+                if retryCount < 1 {
                     state.queue.asyncAfter(deadline: .now() + 0.1) {
                         self.connectToSocksUpstream(state: state, retryCount: retryCount + 1)
                     }
                 } else {
-                    SharedTunnelLogger.log("SOCKS5 upstream connect failed on 127.0.0.1:\(self.socksPort)", tag: "BRIDGE")
-                    self.closeTCPConnection(key: state.key)
+                    SharedTunnelLogger.log("SOCKS5 unreachable; routing \(state.dstIPString):\(state.dstPort) via native/direct relay", tag: "BRIDGE")
+                    self.connectDirectOrVlessUpstream(state: state)
                 }
             case .cancelled:
-                self.closeTCPConnection(key: state.key)
+                self.connectDirectOrVlessUpstream(state: state)
             default:
                 break
             }
         }
         upstream.start(queue: state.queue)
+    }
+
+    private func connectDirectOrVlessUpstream(state: TCPConnectionState) {
+        guard !state.isClosed else { return }
+
+        // If active node is VLESS with valid host and UUID, attempt VLESS tunnel
+        if let node = activeNode, node.protocolType == .vless, !node.serverHost.isEmpty, node.serverPort > 0, let uuid = UUID(uuidString: node.uuid) {
+            connectViaVLESS(state: state, node: node, uuid: uuid)
+            return
+        }
+
+        // Direct TCP fallback
+        connectDirectTCP(state: state)
+    }
+
+    private func connectViaVLESS(state: TCPConnectionState, node: ProxyNode, uuid: UUID) {
+        let endpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host(node.serverHost),
+            port: NWEndpoint.Port(rawValue: node.serverPort) ?? 443
+        )
+
+        let params: NWParameters
+        if node.tlsSecurity == .tls || node.tlsSecurity == .reality {
+            let tlsOptions = NWProtocolTLS.Options()
+            let sni = node.sni ?? node.serverHost
+            sec_protocol_options_set_tls_server_name(tlsOptions.securityProtocolOptions, sni)
+            params = NWParameters(tls: tlsOptions, tcp: NWProtocolTCP.Options())
+        } else {
+            params = NWParameters.tcp
+        }
+
+        let upstream = NWConnection(to: endpoint, using: params)
+        state.upstream = upstream
+
+        upstream.stateUpdateHandler = { [weak self, weak state] status in
+            guard let self, let state, !state.isClosed else { return }
+            switch status {
+            case .ready:
+                // Construct VLESS request: [0x00, uuid (16), addons_len (0), cmd 0x01 (TCP), port (2), addr_type 0x01 (IPv4), ipv4 (4)]
+                var vlessHeader = Data([0x00])
+                var uuidBytes = uuid.uuid
+                withUnsafeBytes(of: &uuidBytes) { ptr in
+                    vlessHeader.append(contentsOf: ptr)
+                }
+                vlessHeader.append(0x00) // Addons length 0
+                vlessHeader.append(0x01) // Command: TCP
+                vlessHeader.append(UInt8(state.dstPort >> 8))
+                vlessHeader.append(UInt8(state.dstPort & 0xFF))
+                vlessHeader.append(0x01) // IPv4
+                vlessHeader.append(contentsOf: state.dstIP)
+
+                upstream.send(content: vlessHeader, completion: .contentProcessed({ [weak self, weak state] sendErr in
+                    guard let self, let state, sendErr == nil, !state.isClosed else {
+                        self?.connectDirectTCP(state: state)
+                        return
+                    }
+
+                    upstream.receive(minimumIncompleteLength: 2, maximumLength: 256) { [weak self, weak state] resp, _, _, respErr in
+                        guard let self, let state, let resp, resp.count >= 2, resp[0] == 0x00, respErr == nil, !state.isClosed else {
+                            self?.connectDirectTCP(state: state)
+                            return
+                        }
+
+                        let addonsLen = Int(resp[1])
+                        let payloadStart = 2 + addonsLen
+
+                        state.isSocksConnected = true
+
+                        if resp.count > payloadStart {
+                            let initialPayload = resp.subdata(in: payloadStart..<resp.count)
+                            self.deliverUpstreamDataToClient(state: state, data: initialPayload)
+                        }
+
+                        state.queue.async {
+                            for chunk in state.pendingClientData {
+                                upstream.send(content: chunk, completion: .contentProcessed({ _ in }))
+                            }
+                            state.pendingClientData.removeAll()
+                        }
+
+                        self.readUpstreamDataContinuously(state: state, upstream: upstream)
+                    }
+                }))
+
+            case .failed, .cancelled:
+                self.connectDirectTCP(state: state)
+
+            default:
+                break
+            }
+        }
+        upstream.start(queue: state.queue)
+    }
+
+    private func connectDirectTCP(state: TCPConnectionState) {
+        guard !state.isClosed else { return }
+
+        state.upstream?.cancel()
+        let endpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host(state.dstIPString),
+            port: NWEndpoint.Port(rawValue: state.dstPort) ?? 80
+        )
+        let upstream = NWConnection(to: endpoint, using: .tcp)
+        state.upstream = upstream
+
+        upstream.stateUpdateHandler = { [weak self, weak state] status in
+            guard let self, let state, !state.isClosed else { return }
+            switch status {
+            case .ready:
+                state.isSocksConnected = true
+                state.queue.async {
+                    for chunk in state.pendingClientData {
+                        upstream.send(content: chunk, completion: .contentProcessed({ _ in }))
+                    }
+                    state.pendingClientData.removeAll()
+                }
+                self.readUpstreamDataContinuously(state: state, upstream: upstream)
+
+            case .failed, .cancelled:
+                self.closeTCPConnection(key: state.key)
+
+            default:
+                break
+            }
+        }
+        upstream.start(queue: state.queue)
+    }
+
+    private func deliverUpstreamDataToClient(state: TCPConnectionState, data: Data) {
+        guard !data.isEmpty, !state.isClosed else { return }
+        if let responsePacket = buildIPv4TCPPacket(
+            srcIP: state.dstIP,
+            srcPort: state.dstPort,
+            dstIP: state.clientIP,
+            dstPort: state.clientPort,
+            seq: state.serverSeq,
+            ack: state.clientSeq,
+            flags: 0x18, // PSH + ACK
+            payload: data
+        ) {
+            packetFlow.writePackets([responsePacket], withProtocols: [AF_INET as NSNumber])
+            lock.withLock {
+                rxBytesTotal &+= UInt64(responsePacket.count)
+            }
+            state.serverSeq &+= UInt32(data.count)
+        }
     }
 
     private func performSOCKS5Handshake(state: TCPConnectionState, upstream: NWConnection) {
@@ -500,23 +664,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
             state.lastActiveAt = Date()
 
             if let data, !data.isEmpty {
-                // Synthesize valid IPv4 TCP packet with payload, sequence matching, and valid checksums
-                if let responsePacket = self.buildIPv4TCPPacket(
-                    srcIP: state.dstIP,
-                    srcPort: state.dstPort,
-                    dstIP: state.clientIP,
-                    dstPort: state.clientPort,
-                    seq: state.serverSeq,
-                    ack: state.clientSeq,
-                    flags: 0x18, // PSH + ACK
-                    payload: data
-                ) {
-                    self.packetFlow.writePackets([responsePacket], withProtocols: [AF_INET as NSNumber])
-                    self.lock.withLock {
-                        self.rxBytesTotal &+= UInt64(responsePacket.count)
-                    }
-                    state.serverSeq &+= UInt32(data.count)
-                }
+                self.deliverUpstreamDataToClient(state: state, data: data)
             }
 
             if isComplete || error != nil {
@@ -592,61 +740,21 @@ public final class TUNPacketBridge: @unchecked Sendable {
     ) {
         guard !queryPayload.isEmpty else { return }
 
-        // Primary: forward to local core dokodemo-door (127.0.0.1:10853)
-        let endpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(dnsHost),
-            port: NWEndpoint.Port(rawValue: dnsPort) ?? 10853
-        )
-        let params = NWParameters.udp
-        let connection = NWConnection(to: endpoint, using: params)
-        let queue = DispatchQueue(label: "northy.dns.\(clientPort)")
-        let dnsContext = DNSResolutionContext()
+        // If local core dokodemo-door DNS on 10853 is active, forward to it
+        if ProxyCoreController.isPortListening(port: Int(dnsPort), timeoutMs: 15) {
+            let endpoint = NWEndpoint.hostPort(
+                host: NWEndpoint.Host(dnsHost),
+                port: NWEndpoint.Port(rawValue: dnsPort) ?? 10853
+            )
+            let params = NWParameters.udp
+            let connection = NWConnection(to: endpoint, using: params)
+            let queue = DispatchQueue(label: "northy.dns.\(clientPort)")
+            let dnsContext = DNSResolutionContext()
 
-        // Timeout fallback after 1.2s if core DNS is not ready
-        queue.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            guard let self else { return }
-            if dnsContext.tryClaim() {
-                connection.cancel()
-                self.forwardDNSQueryFallback(
-                    queryPayload: queryPayload,
-                    clientIPBytes: clientIPBytes,
-                    clientPort: clientPort,
-                    dnsServerIPBytes: dnsServerIPBytes
-                )
-            }
-        }
-
-        connection.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
-            switch state {
-            case .ready:
-                connection.send(content: queryPayload, completion: .contentProcessed({ sendErr in
-                    guard sendErr == nil else {
-                        connection.cancel()
-                        return
-                    }
-                    connection.receiveMessage { data, _, _, _ in
-                        defer { connection.cancel() }
-                        guard let data, !data.isEmpty else { return }
-
-                        guard dnsContext.tryClaim() else { return }
-
-                        if let respPacket = self.buildIPv4UDPPacket(
-                            srcIP: dnsServerIPBytes,
-                            srcPort: 53,
-                            dstIP: clientIPBytes,
-                            dstPort: clientPort,
-                            payload: data
-                        ) {
-                            self.packetFlow.writePackets([respPacket], withProtocols: [AF_INET as NSNumber])
-                            self.lock.withLock {
-                                self.rxBytesTotal &+= UInt64(respPacket.count)
-                            }
-                        }
-                    }
-                }))
-            case .failed, .cancelled:
+            queue.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self else { return }
                 if dnsContext.tryClaim() {
+                    connection.cancel()
                     self.forwardDNSQueryFallback(
                         queryPayload: queryPayload,
                         clientIPBytes: clientIPBytes,
@@ -654,11 +762,58 @@ public final class TUNPacketBridge: @unchecked Sendable {
                         dnsServerIPBytes: dnsServerIPBytes
                     )
                 }
-            default:
-                break
             }
+
+            connection.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    connection.send(content: queryPayload, completion: .contentProcessed({ sendErr in
+                        guard sendErr == nil else {
+                            connection.cancel()
+                            return
+                        }
+                        connection.receiveMessage { data, _, _, _ in
+                            defer { connection.cancel() }
+                            guard let data, !data.isEmpty, dnsContext.tryClaim() else { return }
+
+                            if let respPacket = self.buildIPv4UDPPacket(
+                                srcIP: dnsServerIPBytes,
+                                srcPort: 53,
+                                dstIP: clientIPBytes,
+                                dstPort: clientPort,
+                                payload: data
+                            ) {
+                                self.packetFlow.writePackets([respPacket], withProtocols: [AF_INET as NSNumber])
+                                self.lock.withLock {
+                                    self.rxBytesTotal &+= UInt64(respPacket.count)
+                                }
+                            }
+                        }
+                    }))
+                case .failed, .cancelled:
+                    if dnsContext.tryClaim() {
+                        self.forwardDNSQueryFallback(
+                            queryPayload: queryPayload,
+                            clientIPBytes: clientIPBytes,
+                            clientPort: clientPort,
+                            dnsServerIPBytes: dnsServerIPBytes
+                        )
+                    }
+                default:
+                    break
+                }
+            }
+            connection.start(queue: queue)
+        } else {
+            // Immediate zero-delay DNS resolution via configured upstream resolver
+            forwardDNSQueryFallback(
+                queryPayload: queryPayload,
+                clientIPBytes: clientIPBytes,
+                clientPort: clientPort,
+                dnsServerIPBytes: dnsServerIPBytes
+            )
         }
-        connection.start(queue: queue)
     }
 
     private func forwardDNSQueryFallback(
@@ -667,8 +822,8 @@ public final class TUNPacketBridge: @unchecked Sendable {
         clientPort: UInt16,
         dnsServerIPBytes: [UInt8]
     ) {
-        // Query fallback resolver 1.1.1.1:53 directly over UDP
-        let endpoint = NWEndpoint.hostPort(host: "1.1.1.1", port: 53)
+        let resolverHost = routingConfig?.dnsProvider.resolverAddresses.first ?? "1.1.1.1"
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(resolverHost), port: 53)
         let connection = NWConnection(to: endpoint, using: .udp)
         let queue = DispatchQueue(label: "northy.dns.fb.\(clientPort)")
 

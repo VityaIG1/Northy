@@ -449,6 +449,68 @@ public struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .disabled(vpnManager.isPingingAll)
+
+            // Sort servers by ping toggle
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.up.arrow.down.circle")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.accentColor)
+                    .frame(width: 24, height: 24, alignment: .center)
+
+                Text(localization.selectedOption.resolvedLanguageCode == "ru" ? "Сортировать по пингу" : "Sort by Ping")
+                    .font(NothingTypography.technicalMono(size: 13, weight: .bold))
+                    .foregroundStyle(NothingPalette.pureWhite)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Spacer(minLength: 8)
+
+                Toggle("", isOn: Binding(
+                    get: { vpnManager.pingSettings.sortNodesByLatency },
+                    set: { val in
+                        var updated = vpnManager.pingSettings
+                        updated.sortNodesByLatency = val
+                        vpnManager.updatePingSettings(updated)
+                        if val {
+                            vpnManager.sortNodesByCurrentLatency()
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(theme.accentColor)
+            }
+            .frame(minHeight: 44)
+
+            // Sort servers by ping now action
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                vpnManager.sortNodesByCurrentLatency()
+                vpnManager.statusBannerMessage = localization.selectedOption.resolvedLanguageCode == "ru"
+                    ? "СЕРВЕРЫ ОТСОРТИРОВАНЫ ПО ПИНГУ"
+                    : "SERVERS SORTED BY LOWEST PING"
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.accentColor)
+                        .frame(width: 24, height: 24, alignment: .center)
+
+                    Text(localization.selectedOption.resolvedLanguageCode == "ru" ? "Отсортировать серверы сейчас" : "Sort Servers by Ping Now")
+                        .font(NothingTypography.technicalMono(size: 13, weight: .bold))
+                        .foregroundStyle(theme.accentColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                }
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
         } header: {
             Text(localization.selectedOption.resolvedLanguageCode == "ru" ? "// ЗАДЕРЖКА И ДИАГНОСТИКА" : "// LATENCY & DIAGNOSTICS")
                 .font(NothingTypography.technicalMono(size: 11, weight: .bold))
@@ -685,21 +747,32 @@ public struct SettingsView: View {
 
     private var versionFooterSection: some View {
         Section {
-            VStack(spacing: 6) {
-                NothingDotMatrixLabel(
-                    text: "NORTHY",
-                    dotSize: 2.2,
-                    spacing: 1.1,
-                    activeColor: NothingPalette.pureWhite
-                )
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    NothingDotMatrixLabel(
+                        text: "VERSION \(Self.marketingVersion)",
+                        dotSize: 2.2,
+                        spacing: 1.0,
+                        activeColor: theme.accentColor
+                    )
+                    Spacer()
+                    Text("BUILD \(Self.buildNumber) // SWIFT 6")
+                        .font(NothingTypography.technicalMono(size: 10, weight: .medium))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                }
 
-                Text("VERSION 0.4.0 // BUILD 4")
-                    .font(NothingTypography.technicalMono(size: 10, weight: .bold))
-                    .foregroundStyle(theme.accentColor)
-                    .tracking(1.4)
+                HStack {
+                    Text("NORTHY // NOTHING OS VPN")
+                        .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                        .foregroundStyle(theme.accentColor)
+                    Spacer()
+                    Text("OPEN SOURCE // CORE ENGINE")
+                        .font(NothingTypography.technicalMono(size: 9, weight: .regular))
+                        .foregroundStyle(NothingPalette.mutedGrey)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
             .listRowBackground(Color.clear)
         }
     }
@@ -930,6 +1003,8 @@ public struct ConnectionLogsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var copied: Bool = false
+    @State private var logs: [String] = []
+    @State private var logsCopied: Bool = false
 
     public var body: some View {
         NavigationStack {
@@ -1032,6 +1107,49 @@ public struct ConnectionLogsView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                Section {
+                    if logs.isEmpty {
+                        Text("// No log entries found.")
+                            .font(NothingTypography.technicalMono(size: 11, weight: .regular))
+                            .foregroundStyle(NothingPalette.mutedGrey)
+                            .padding(.vertical, 8)
+                    } else {
+                        ScrollView(.vertical) {
+                            LazyVStack(alignment: .leading, spacing: 3) {
+                                ForEach(Array(logs.suffix(100).enumerated()), id: \.offset) { _, line in
+                                    Text(line)
+                                        .font(NothingTypography.technicalMono(size: 10, weight: .regular))
+                                        .foregroundStyle(line.contains("[ERROR]") ? ThemeManager.shared.accentColor : NothingPalette.pureWhite.opacity(0.85))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .frame(maxHeight: 220)
+                    }
+                } header: {
+                    HStack {
+                        Text("// LIVE DIAGNOSTICS LOGS")
+                            .font(NothingTypography.technicalMono(size: 11, weight: .bold))
+                            .foregroundStyle(NothingPalette.mutedGrey)
+
+                        Spacer()
+
+                        Button {
+                            UIPasteboard.general.string = SharedTunnelLogger.readFullLogString()
+                            logsCopied = true
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                logsCopied = false
+                            }
+                        } label: {
+                            Text(logsCopied ? "[COPIED!]" : "[COPY LOGS]")
+                                .font(NothingTypography.technicalMono(size: 10, weight: .bold))
+                                .foregroundStyle(ThemeManager.shared.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
@@ -1046,6 +1164,9 @@ public struct ConnectionLogsView: View {
                     .font(NothingTypography.technicalMono(size: 11, weight: .bold))
                     .foregroundStyle(ThemeManager.shared.accentColor)
                 }
+            }
+            .onAppear {
+                logs = SharedTunnelLogger.readLogs()
             }
         }
     }

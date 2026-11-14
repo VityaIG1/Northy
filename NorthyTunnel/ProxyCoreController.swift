@@ -153,48 +153,64 @@ public final class ProxyCoreController: @unchecked Sendable {
         return nil
     }
 
-    private func waitForCoreReady(port: Int = 10808, timeoutMs: Int = 800) -> Bool {
+    // MARK: - Port Availability & Core Readiness
+
+    public static func isPortListening(port: Int, timeoutMs: Int = 40) -> Bool {
         #if canImport(Darwin)
+        let sock = socket(AF_INET, SOCK_STREAM, 0)
+        guard sock >= 0 else { return false }
+        defer { close(sock) }
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = UInt16(port).bigEndian
+        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+
+        let flags = fcntl(sock, F_GETFL, 0)
+        _ = fcntl(sock, F_SETFL, flags | O_NONBLOCK)
+
+        let res = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                connect(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+
+        if res == 0 {
+            return true
+        } else if errno == EINPROGRESS {
+            var pfd = pollfd(fd: sock, events: Int16(POLLOUT), revents: 0)
+            let pollRes = poll(&pfd, 1, Int32(timeoutMs))
+            if pollRes > 0 && (pfd.revents & Int16(POLLOUT)) != 0 {
+                var err: Int32 = 0
+                var len = socklen_t(MemoryLayout<Int32>.size)
+                getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len)
+                return err == 0
+            }
+        }
+        #endif
+        return false
+    }
+
+    public var isSocksReady: Bool {
+        Self.isPortListening(port: 10808)
+    }
+
+    public var isHttpProxyReady: Bool {
+        Self.isPortListening(port: 10809)
+    }
+
+    public var isDnsReady: Bool {
+        Self.isPortListening(port: 10853)
+    }
+
+    private func waitForCoreReady(port: Int = 10808, timeoutMs: Int = 800) -> Bool {
         let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
         while Date() < deadline {
-            let sock = socket(AF_INET, SOCK_STREAM, 0)
-            if sock >= 0 {
-                var addr = sockaddr_in()
-                addr.sin_family = sa_family_t(AF_INET)
-                addr.sin_port = UInt16(port).bigEndian
-                inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
-
-                let flags = fcntl(sock, F_GETFL, 0)
-                _ = fcntl(sock, F_SETFL, flags | O_NONBLOCK)
-
-                let res = withUnsafePointer(to: &addr) {
-                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                        connect(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-                    }
-                }
-
-                if res == 0 {
-                    close(sock)
-                    return true
-                } else if errno == EINPROGRESS {
-                    var pfd = pollfd(fd: sock, events: Int16(POLLOUT), revents: 0)
-                    let pollRes = poll(&pfd, 1, 50)
-                    if pollRes > 0 && (pfd.revents & Int16(POLLOUT)) != 0 {
-                        var err: Int32 = 0
-                        var len = socklen_t(MemoryLayout<Int32>.size)
-                        getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len)
-                        close(sock)
-                        if err == 0 { return true }
-                    } else {
-                        close(sock)
-                    }
-                } else {
-                    close(sock)
-                }
+            if Self.isPortListening(port: port, timeoutMs: 30) {
+                return true
             }
             Thread.sleep(forTimeInterval: 0.05)
         }
-        #endif
         return false
     }
 

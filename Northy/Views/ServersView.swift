@@ -174,7 +174,7 @@ public struct ServersView: View {
                     await vpnManager.toggleTunnelConnection()
                 }
             }
-            .frame(height: 208)
+            .frame(height: 216)
 
             // Active Node & Status Headline Label
             VStack(spacing: 4) {

@@ -73,6 +73,8 @@ public final class VPNTunnelManager {
         self.connectionSettings = store.loadConnectionSettings()
         self.subscriptionSettings = store.loadSubscriptionSettings()
 
+        SharedTunnelLogger.log("VPNTunnelManager initialized: \(loadedNodes.count) node(s), \(subscriptions.count) subscription(s)", tag: "APP")
+
         observeSystemVPNStatus()
         Task {
             await bootstrapProviderManager()
@@ -463,6 +465,7 @@ public final class VPNTunnelManager {
 
     public func toggleTunnelConnection() async {
         if isConnected || isTransitioning {
+            SharedTunnelLogger.log("User disconnected VPN tunnel", tag: "VPN")
             providerManager?.connection.stopVPNTunnel()
             connectionStatus = .disconnected
             telemetry = TunnelRuntimeTelemetry()
@@ -476,9 +479,11 @@ public final class VPNTunnelManager {
 
         guard let node = selectedNode else {
             statusBannerMessage = "NO SERVER SELECTED"
+            SharedTunnelLogger.log("Connection aborted: no node selected", tag: "VPN")
             return
         }
 
+        SharedTunnelLogger.log("Initiating VPN connection -> \(node.remark) (\(node.serverHost):\(node.serverPort))", tag: "VPN")
         connectionStatus = .connecting
 
         do {
@@ -491,14 +496,17 @@ public final class VPNTunnelManager {
 
             let manager = try await ensureTunnelManagerConfigured(for: node, coreJSONData: coreJSONData)
             try manager.connection.startVPNTunnel()
+            SharedTunnelLogger.log("Invoked startVPNTunnel successfully", tag: "VPN")
         } catch {
             connectionStatus = .disconnected
             statusBannerMessage = "TUNNEL ERROR // \(error.localizedDescription.uppercased())"
+            SharedTunnelLogger.log("Failed to start VPN: \(error.localizedDescription)", tag: "ERROR")
         }
     }
 
     public func restartTunnelWithActiveNode() async {
         guard let node = selectedNode else { return }
+        SharedTunnelLogger.log("Restarting tunnel with active node: \(node.remark)", tag: "VPN")
         connectionStatus = .reasserting
 
         providerManager?.connection.stopVPNTunnel()
@@ -522,9 +530,11 @@ public final class VPNTunnelManager {
             try manager.connection.startVPNTunnel()
             connectionStatus = .connecting
             statusBannerMessage = "SWITCHED TO // \(node.remark)"
+            SharedTunnelLogger.log("Switched to node: \(node.remark)", tag: "VPN")
         } catch {
             connectionStatus = .disconnected
             statusBannerMessage = "TUNNEL SWITCH ERROR // \(error.localizedDescription.uppercased())"
+            SharedTunnelLogger.log("Tunnel switch failed: \(error.localizedDescription)", tag: "ERROR")
         }
     }
 
@@ -534,13 +544,16 @@ public final class VPNTunnelManager {
             if let existing = managers.first {
                 self.providerManager = existing
                 self.connectionStatus = existing.connection.status
+                SharedTunnelLogger.log("Loaded system VPN profile, status: \(existing.connection.status.rawValue)", tag: "VPN")
                 if existing.connection.status == .connected {
                     self.connectedSince = existing.connection.connectedDate ?? .now
                     self.startTelemetryPolling()
                 }
+            } else {
+                SharedTunnelLogger.log("No existing system VPN profile found", tag: "VPN")
             }
         } catch {
-            // System VPN preferences unavailable until first tunnel activation
+            SharedTunnelLogger.log("Preferences load error: \(error.localizedDescription)", tag: "VPN")
         }
     }
 
@@ -598,6 +611,7 @@ public final class VPNTunnelManager {
             let connectedDate = session.connectedDate
             Task { @MainActor in
                 self.connectionStatus = status
+                SharedTunnelLogger.log("System VPN status changed: \(status)", tag: "VPN")
                 if status == .connected {
                     if self.connectedSince == nil {
                         self.connectedSince = connectedDate ?? .now

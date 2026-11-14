@@ -64,6 +64,7 @@ public struct TunnelDiagnosticsSheet: View {
             }
         }
         .task {
+            SharedTunnelLogger.log("Diagnostics console active. VPN state: \(vpnManager.connectionStatus)", tag: "DIAG")
             refreshLogs()
             startPeriodicRefresh()
         }
@@ -230,21 +231,20 @@ public struct TunnelDiagnosticsSheet: View {
                 }
 
                 // Export / Share Logs Button
-                if let logURL = SharedTunnelLogger.exportLogURL() {
-                    ShareLink(item: logURL) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("EXPORT")
-                                .font(NothingTypography.technicalMono(size: 11, weight: .bold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(NothingPalette.surfacePrimary)
-                        .foregroundStyle(NothingPalette.pureWhite)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(NothingPalette.gridStroke, lineWidth: 1))
+                let logURL = SharedTunnelLogger.exportLogURL()
+                ShareLink(item: logURL) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("EXPORT")
+                            .font(NothingTypography.technicalMono(size: 11, weight: .bold))
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(NothingPalette.surfacePrimary)
+                    .foregroundStyle(NothingPalette.pureWhite)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(NothingPalette.gridStroke, lineWidth: 1))
                 }
 
                 // Clear Logs Button

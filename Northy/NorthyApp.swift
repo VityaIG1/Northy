@@ -9,7 +9,9 @@ public struct NorthyApp: App {
     @State private var theme = ThemeManager.shared
     @State private var activeTab: NothingNavigationTab = .servers
 
-    public init() {}
+    public init() {
+        SharedTunnelLogger.log("Northy app launched. Version: 0.4.0 (Build 4)", tag: "APP")
+    }
 
     public var body: some Scene {
         WindowGroup {
