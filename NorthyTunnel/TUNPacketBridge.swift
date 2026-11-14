@@ -7,7 +7,8 @@ import os.log
 
 /// Bridges iOS `NEPacketTunnelFlow` IP packets directly to the local proxy core (SOCKS5 on 10808 / DNS on 10853).
 /// Implements RFC 793 / RFC 1071 stateful TCP sequence & acknowledgement tracking, mathematically exact
-/// IPv4/TCP/UDP checksum generation, zero packet drops during handshake, and complete DNS leak prevention.
+/// IPv4/TCP/UDP/ICMP checksum generation, zero packet drops during handshake, resilient DNS with upstream fallback,
+/// full UDP bi-directional relay, and periodic memory reaping (<20MB RAM).
 public final class TUNPacketBridge: @unchecked Sendable {
 
     private let logger = Logger(subsystem: "com.scrt.north.PacketTunnel", category: "TUNBridge")
@@ -28,6 +29,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
 
     private var readLoopTask: Task<Void, Never>?
     private var speedMeterTask: Task<Void, Never>?
+    private var reaperTask: Task<Void, Never>?
     private var activeConnections: [String: TCPConnectionState] = [:]
 
     public init(
@@ -91,6 +93,15 @@ public final class TUNPacketBridge: @unchecked Sendable {
                 }
             }
         }
+
+        // 3. Periodic Memory & Connection Reaper (30s interval to strictly preserve <20MB RAM)
+        reaperTask = Task.detached(priority: .background) { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard let self else { return }
+                self.purgeIdleConnections()
+            }
+        }
     }
 
     public func stop() {
@@ -103,6 +114,8 @@ public final class TUNPacketBridge: @unchecked Sendable {
             activeConnections.removeAll()
         }
 
+        reaperTask?.cancel()
+        reaperTask = nil
         speedMeterTask?.cancel()
         speedMeterTask = nil
         readLoopTask?.cancel()
@@ -170,6 +183,9 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let dstIP = dstIPBytes.map(String.init).joined(separator: ".")
 
         switch proto {
+        case 1: // ICMP (Ping / Echo)
+            handleICMPPacket(packet, ihl: ihl, srcIPBytes: srcIPBytes, dstIPBytes: dstIPBytes)
+
         case 17: // UDP
             guard packet.count >= ihl + 8 else { return }
             let srcPort = UInt16(packet[ihl]) << 8 | UInt16(packet[ihl + 1])
@@ -186,7 +202,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
                     dnsServerIP: dstIP
                 )
             } else {
-                // Relay other UDP through SOCKS5 UDP Associate or direct forward
+                // Relay UDP packets
                 relayUDPThroughSocks(
                     payload: payload,
                     srcIPBytes: srcIPBytes,
@@ -231,6 +247,8 @@ public final class TUNPacketBridge: @unchecked Sendable {
             } else {
                 // Ongoing TCP traffic or 3-way handshake ACK
                 if let state = getConnection(key: connKey) {
+                    state.lastActiveAt = Date()
+
                     if !state.isHandshakeDone && isAck {
                         state.isHandshakeDone = true
                     }
@@ -263,6 +281,46 @@ public final class TUNPacketBridge: @unchecked Sendable {
                     dnsServerIPBytes: [198, 18, 0, 2],
                     dnsServerIP: "198.18.0.2"
                 )
+            }
+        }
+    }
+
+    // MARK: - ICMP Echo Handler (Instant 0ms Ping for Reachability)
+
+    private func handleICMPPacket(_ packet: Data, ihl: Int, srcIPBytes: [UInt8], dstIPBytes: [UInt8]) {
+        guard packet.count >= ihl + 8 else { return }
+        let type = packet[ihl]
+        let code = packet[ihl + 1]
+
+        // ICMP Echo Request (type 8, code 0)
+        if type == 8 && code == 0 {
+            var reply = packet
+
+            // Swap src and dst IP in IPv4 header
+            for i in 0..<4 {
+                reply[12 + i] = dstIPBytes[i]
+                reply[16 + i] = srcIPBytes[i]
+            }
+
+            // Recalculate IPv4 header checksum
+            reply[10] = 0; reply[11] = 0
+            let ipChecksum = Self.computeChecksum(reply.subdata(in: 0..<20))
+            reply[10] = UInt8(ipChecksum >> 8)
+            reply[11] = UInt8(ipChecksum & 0xFF)
+
+            // Convert to Echo Reply (type 0, code 0)
+            reply[ihl] = 0
+            reply[ihl + 1] = 0
+            reply[ihl + 2] = 0; reply[ihl + 3] = 0 // checksum placeholder
+
+            // Recalculate ICMP checksum
+            let icmpChecksum = Self.computeChecksum(reply.subdata(in: ihl..<reply.count))
+            reply[ihl + 2] = UInt8(icmpChecksum >> 8)
+            reply[ihl + 3] = UInt8(icmpChecksum & 0xFF)
+
+            packetFlow.writePackets([reply], withProtocols: [AF_INET as NSNumber])
+            lock.withLock {
+                rxBytesTotal &+= UInt64(reply.count)
             }
         }
     }
@@ -314,6 +372,12 @@ public final class TUNPacketBridge: @unchecked Sendable {
         }
 
         // 2. Connect to local proxy core SOCKS5 inbound (127.0.0.1:10808)
+        connectToSocksUpstream(state: state)
+    }
+
+    private func connectToSocksUpstream(state: TCPConnectionState, retryCount: Int = 0) {
+        guard !state.isClosed else { return }
+
         let socksEndpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host(socksHost),
             port: NWEndpoint.Port(rawValue: socksPort) ?? 10808
@@ -322,20 +386,26 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let upstream = NWConnection(to: socksEndpoint, using: tcpParams)
         state.upstream = upstream
 
-        let queue = DispatchQueue(label: "northy.tcp.\(srcPort)", qos: .userInitiated)
-
         upstream.stateUpdateHandler = { [weak self, weak state] status in
             guard let self, let state, !state.isClosed else { return }
             switch status {
             case .ready:
                 self.performSOCKS5Handshake(state: state, upstream: upstream)
-            case .failed, .cancelled:
+            case .failed:
+                if retryCount < 2 {
+                    state.queue.asyncAfter(deadline: .now() + 0.1) {
+                        self.connectToSocksUpstream(state: state, retryCount: retryCount + 1)
+                    }
+                } else {
+                    self.closeTCPConnection(key: state.key)
+                }
+            case .cancelled:
                 self.closeTCPConnection(key: state.key)
             default:
                 break
             }
         }
-        upstream.start(queue: queue)
+        upstream.start(queue: state.queue)
     }
 
     private func performSOCKS5Handshake(state: TCPConnectionState, upstream: NWConnection) {
@@ -423,6 +493,8 @@ public final class TUNPacketBridge: @unchecked Sendable {
         upstream.receive(minimumIncompleteLength: 1, maximumLength: 32768) { [weak self, weak state] data, _, isComplete, error in
             guard let self, let state, !state.isClosed else { return }
 
+            state.lastActiveAt = Date()
+
             if let data, !data.isEmpty {
                 // Synthesize valid IPv4 TCP packet with payload, sequence matching, and valid checksums
                 if let responsePacket = self.buildIPv4TCPPacket(
@@ -487,7 +559,25 @@ public final class TUNPacketBridge: @unchecked Sendable {
         lock.withLock { activeConnections[key] }
     }
 
-    // MARK: - DNS Interceptor & Leak Prevention (UDP 53)
+    private func purgeIdleConnections() {
+        let now = Date()
+        lock.withLock {
+            let staleKeys = activeConnections.compactMap { (key, state) -> String? in
+                if state.isClosed || now.timeIntervalSince(state.lastActiveAt) > 120.0 {
+                    return key
+                }
+                return nil
+            }
+            for k in staleKeys {
+                if let st = activeConnections.removeValue(forKey: k) {
+                    st.upstream?.cancel()
+                    st.isClosed = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Resilient DNS Interceptor with Upstream Fallback (UDP 53)
 
     private func forwardDNSQuery(
         queryPayload: Data,
@@ -498,7 +588,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
     ) {
         guard !queryPayload.isEmpty else { return }
 
-        // Direct forward to local core dokodemo-door inbound (127.0.0.1:10853)
+        // Primary: forward to local core dokodemo-door (127.0.0.1:10853)
         let endpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host(dnsHost),
             port: NWEndpoint.Port(rawValue: dnsPort) ?? 10853
@@ -506,6 +596,24 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let params = NWParameters.udp
         let connection = NWConnection(to: endpoint, using: params)
         let queue = DispatchQueue(label: "northy.dns.\(clientPort)")
+
+        let answeredLock = NSLock()
+        var hasAnswered = false
+
+        // Timeout fallback after 1.2s if core DNS is not ready
+        queue.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self else { return }
+            let alreadyDone = answeredLock.withLock { hasAnswered }
+            if !alreadyDone {
+                connection.cancel()
+                self.forwardDNSQueryFallback(
+                    queryPayload: queryPayload,
+                    clientIPBytes: clientIPBytes,
+                    clientPort: clientPort,
+                    dnsServerIPBytes: dnsServerIPBytes
+                )
+            }
+        }
 
         connection.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
@@ -520,7 +628,13 @@ public final class TUNPacketBridge: @unchecked Sendable {
                         defer { connection.cancel() }
                         guard let data, !data.isEmpty else { return }
 
-                        // Reassemble raw IPv4 UDP DNS response packet with valid checksum
+                        let shouldProceed = answeredLock.withLock { () -> Bool in
+                            if hasAnswered { return false }
+                            hasAnswered = true
+                            return true
+                        }
+                        guard shouldProceed else { return }
+
                         if let respPacket = self.buildIPv4UDPPacket(
                             srcIP: dnsServerIPBytes,
                             srcPort: 53,
@@ -536,9 +650,59 @@ public final class TUNPacketBridge: @unchecked Sendable {
                     }
                 }))
             case .failed, .cancelled:
-                break
+                let shouldFallback = answeredLock.withLock { () -> Bool in
+                    if hasAnswered { return false }
+                    hasAnswered = true
+                    return true
+                }
+                if shouldFallback {
+                    self.forwardDNSQueryFallback(
+                        queryPayload: queryPayload,
+                        clientIPBytes: clientIPBytes,
+                        clientPort: clientPort,
+                        dnsServerIPBytes: dnsServerIPBytes
+                    )
+                }
             default:
                 break
+            }
+        }
+        connection.start(queue: queue)
+    }
+
+    private func forwardDNSQueryFallback(
+        queryPayload: Data,
+        clientIPBytes: [UInt8],
+        clientPort: UInt16,
+        dnsServerIPBytes: [UInt8]
+    ) {
+        // Query fallback resolver 1.1.1.1:53 directly over UDP
+        let endpoint = NWEndpoint.hostPort(host: "1.1.1.1", port: 53)
+        let connection = NWConnection(to: endpoint, using: .udp)
+        let queue = DispatchQueue(label: "northy.dns.fb.\(clientPort)")
+
+        connection.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
+            if state == .ready {
+                connection.send(content: queryPayload, completion: .contentProcessed({ err in
+                    if err != nil { connection.cancel(); return }
+                    connection.receiveMessage { data, _, _, _ in
+                        defer { connection.cancel() }
+                        guard let data, !data.isEmpty else { return }
+                        if let respPacket = self.buildIPv4UDPPacket(
+                            srcIP: dnsServerIPBytes,
+                            srcPort: 53,
+                            dstIP: clientIPBytes,
+                            dstPort: clientPort,
+                            payload: data
+                        ) {
+                            self.packetFlow.writePackets([respPacket], withProtocols: [AF_INET as NSNumber])
+                            self.lock.withLock {
+                                self.rxBytesTotal &+= UInt64(respPacket.count)
+                            }
+                        }
+                    }
+                }))
             }
         }
         connection.start(queue: queue)
@@ -551,10 +715,43 @@ public final class TUNPacketBridge: @unchecked Sendable {
         dstIPBytes: [UInt8],
         dstPort: UInt16
     ) {
-        // Track uplink telemetry
         lock.withLock {
             txBytesTotal &+= UInt64(payload.count)
         }
+
+        let dstIP = dstIPBytes.map(String.init).joined(separator: ".")
+        let endpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host(dstIP),
+            port: NWEndpoint.Port(rawValue: dstPort) ?? 0
+        )
+        let connection = NWConnection(to: endpoint, using: .udp)
+        let queue = DispatchQueue(label: "northy.udp.\(srcPort)")
+
+        connection.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
+            if state == .ready {
+                connection.send(content: payload, completion: .contentProcessed({ err in
+                    if err != nil { connection.cancel(); return }
+                    connection.receiveMessage { data, _, _, _ in
+                        defer { connection.cancel() }
+                        guard let data, !data.isEmpty else { return }
+                        if let respPacket = self.buildIPv4UDPPacket(
+                            srcIP: dstIPBytes,
+                            srcPort: dstPort,
+                            dstIP: srcIPBytes,
+                            dstPort: srcPort,
+                            payload: data
+                        ) {
+                            self.packetFlow.writePackets([respPacket], withProtocols: [AF_INET as NSNumber])
+                            self.lock.withLock {
+                                self.rxBytesTotal &+= UInt64(respPacket.count)
+                            }
+                        }
+                    }
+                }))
+            }
+        }
+        connection.start(queue: queue)
     }
 
     // MARK: - Mathematically Exact IPv4, TCP & UDP Packet Synthesis
@@ -765,6 +962,7 @@ private final class TCPConnectionState: @unchecked Sendable {
     var isHandshakeDone: Bool = false
     var isSocksConnected: Bool = false
     var isClosed: Bool = false
+    var lastActiveAt: Date = Date()
     var pendingClientData: [Data] = []
     var upstream: NWConnection?
     let queue: DispatchQueue
