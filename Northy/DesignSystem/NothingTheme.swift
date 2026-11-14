@@ -24,7 +24,24 @@ public final class ThemeManager {
     public var accentHex: String {
         didSet {
             UserDefaults.standard.set(accentHex, forKey: StorageKeys.accentHex)
+            applyUIKitAppearance()
         }
+    }
+
+    public func applyUIKitAppearance() {
+        #if canImport(UIKit)
+        let uiColor = UIColor(accentColor)
+        UIView.appearance().tintColor = uiColor
+        UINavigationBar.appearance().tintColor = uiColor
+        UITabBar.appearance().tintColor = uiColor
+        UISwitch.appearance().onTintColor = uiColor
+
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            for window in scene.windows {
+                window.tintColor = uiColor
+            }
+        }
+        #endif
     }
 
     /// Card & container corner radius (0pt sharp vs 18pt rounded)
@@ -58,6 +75,7 @@ public final class ThemeManager {
         self.isRoundedCorners = UserDefaults.standard.bool(forKey: StorageKeys.isRoundedCorners)
         let savedHex = UserDefaults.standard.string(forKey: StorageKeys.accentHex) ?? Self.defaultAccentHex
         self.accentHex = savedHex
+        applyUIKitAppearance()
     }
 }
 

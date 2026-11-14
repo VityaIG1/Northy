@@ -32,31 +32,36 @@ public struct NothingRootShellView: View {
     @Binding var activeTab: NothingNavigationTab
 
     public var body: some View {
-        VStack(spacing: 0) {
-            Group {
-                switch activeTab {
-                case .servers:
-                    ServersView(
-                        vpnManager: vpnManager,
-                        localization: localization,
-                        onOpenSettings: { activeTab = .settings }
-                    )
-                case .settings:
-                    SettingsView(
-                        vpnManager: vpnManager,
-                        localization: localization
-                    )
-                }
+        TabView(selection: $activeTab) {
+            NavigationStack {
+                ServersView(
+                    vpnManager: vpnManager,
+                    localization: localization,
+                    onOpenSettings: { activeTab = .settings }
+                )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .tabItem {
+                Label(localization.tr("tab.servers"), systemImage: "network")
+            }
+            .tag(NothingNavigationTab.servers)
 
-            NothingBottomTabBar(
-                activeTab: $activeTab,
-                serversTitle: localization.tr("tab.servers"),
-                settingsTitle: localization.tr("tab.settings"),
-                isTunnelActive: vpnManager.isConnected
-            )
+            NavigationStack {
+                SettingsView(
+                    vpnManager: vpnManager,
+                    localization: localization
+                )
+            }
+            .tabItem {
+                Label(localization.tr("tab.settings"), systemImage: "gearshape")
+            }
+            .tag(NothingNavigationTab.settings)
         }
-        .background(NothingPalette.trueBlack.ignoresSafeArea())
+        .tint(theme.accentColor)
+        .onAppear {
+            theme.applyUIKitAppearance()
+        }
+        .onChange(of: theme.accentHex) { _, _ in
+            theme.applyUIKitAppearance()
+        }
     }
 }

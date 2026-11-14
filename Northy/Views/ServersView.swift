@@ -35,26 +35,23 @@ public struct ServersView: View {
     public var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
-                // 1. Top Action Bar: Settings on left, Northy dot-matrix center, Add (+) on right
-                topNavigationBar
-
-                // 2. Center Hero Power Control & Active Tunnel Status
+                // 1. Center Hero Power Control & Active Tunnel Status (with Interactive World Map)
                 centralHeroPowerControl
 
-                // 3. Quick Telemetry Matrix (Uptime & Live KB/MB Speeds)
+                // 2. Quick Telemetry Matrix (Uptime & Live KB/MB Speeds)
                 liveSessionTelemetryStrip
 
                 if let banner = vpnManager.statusBannerMessage {
                     diagnosticBanner(banner)
                 }
 
-                // 4. Quick Visibility Toggle ("Hide everything" / "Show everything")
+                // 3. Quick Visibility Toggle ("Hide everything" / "Show everything")
                 quickVisibilityToggleRow
 
-                // 5. Expandable Subscription Cards & Metadata System
+                // 4. Expandable Subscription Cards & Metadata System
                 subscriptionCardsStack
 
-                // 6. Manual / Unassigned Nodes (if any)
+                // 5. Manual / Unassigned Nodes (if any)
                 manualNodesCard
             }
             .padding(.horizontal, 16)
@@ -62,6 +59,56 @@ public struct ServersView: View {
             .padding(.bottom, 32)
         }
         .background(NothingPalette.trueBlack)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    onOpenSettings?()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(NothingPalette.pureWhite)
+                }
+                .accessibilityLabel("Settings")
+            }
+
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    NothingDotMatrixLabel(
+                        text: "NORTHY",
+                        dotSize: 2.2,
+                        spacing: 1.0,
+                        activeColor: NothingPalette.pureWhite
+                    )
+
+                    TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
+                        NothingDotMatrixLabel(
+                            text: Self.formatUptime(
+                                since: vpnManager.connectedSince,
+                                now: ctx.date,
+                                isConnected: vpnManager.isConnected
+                            ),
+                            dotSize: 1.8,
+                            spacing: 0.8,
+                            activeColor: vpnManager.isConnected
+                                ? theme.accentColor
+                                : NothingPalette.mutedGrey.opacity(0.6)
+                        )
+                    }
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showAddSubscriptionSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(theme.accentColor)
+                }
+                .accessibilityLabel("Add Subscription")
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
         .sensoryFeedback(.impact(flexibility: .solid, intensity: 0.8), trigger: vpnManager.isConnected)
         .sheet(isPresented: $showAddSubscriptionSheet) {
             AddSubscriptionSheet(vpnManager: vpnManager, localization: localization)
@@ -74,67 +121,30 @@ public struct ServersView: View {
         }
     }
 
-    // MARK: - 1. Top Action Bar
-
-    private var topNavigationBar: some View {
-        HStack(alignment: .center) {
-            // Top-Left: Settings Button
-            Button {
-                onOpenSettings?()
-            } label: {
-                ZStack {
-                    Rectangle()
-                        .fill(NothingPalette.surfaceElevated)
-                        .frame(width: 38, height: 38)
-                        .overlay(
-                            Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
-                        )
-
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(NothingPalette.pureWhite)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Settings")
-
-            Spacer()
-
-            // Center Branding Dot-Matrix
-            NothingDotMatrixLabel(
-                text: "NORTHY",
-                dotSize: 2.4,
-                spacing: 1.1,
-                activeColor: NothingPalette.pureWhite
-            )
-
-            Spacer()
-
-            // Top-Right: Add / Import Subscription Button (+)
-            Button {
-                showAddSubscriptionSheet = true
-            } label: {
-                ZStack {
-                    Rectangle()
-                        .fill(NothingPalette.surfaceElevated)
-                        .frame(width: 38, height: 38)
-                        .overlay(
-                            Rectangle().strokeBorder(NothingPalette.gridStroke, lineWidth: 1)
-                        )
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(theme.accentColor)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: theme.chipCornerRadius))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add Subscription")
-        }
-    }
-
     // MARK: - 2. Center Hero Power Control
+
+    private func isoFromNode(_ node: ProxyNode) -> String? {
+        let r = node.remark.uppercased()
+        if r.contains("🇺🇸") || r.contains("USA") || r.contains("UNITED STATES") || r.hasPrefix("US-") || r.hasPrefix("US ") { return "US" }
+        if r.contains("🇷🇺") || r.contains("RUSSIA") || r.hasPrefix("RU-") || r.hasPrefix("RU ") { return "RU" }
+        if r.contains("🇩🇪") || r.contains("GERMANY") || r.hasPrefix("DE-") { return "DE" }
+        if r.contains("🇫🇷") || r.contains("FRANCE") || r.hasPrefix("FR-") { return "FR" }
+        if r.contains("🇬🇧") || r.contains("UK") || r.contains("BRITAIN") || r.hasPrefix("GB-") { return "GB" }
+        if r.contains("🇯🇵") || r.contains("JAPAN") || r.hasPrefix("JP-") { return "JP" }
+        if r.contains("🇨🇳") || r.contains("CHINA") || r.hasPrefix("CN-") { return "CN" }
+        if r.contains("🇮🇳") || r.contains("INDIA") || r.hasPrefix("IN-") { return "IN" }
+        if r.contains("🇧🇷") || r.contains("BRAZIL") || r.hasPrefix("BR-") { return "BR" }
+        if r.contains("🇦🇺") || r.contains("AUSTRALIA") || r.hasPrefix("AU-") { return "AU" }
+        if r.contains("🇨🇦") || r.contains("CANADA") || r.hasPrefix("CA-") { return "CA" }
+        if r.contains("🇳🇱") || r.contains("NETHERLANDS") || r.hasPrefix("NL-") { return "NL" }
+        if r.contains("🇸🇪") || r.contains("SWEDEN") || r.hasPrefix("SE-") { return "SE" }
+        if r.contains("🇫🇮") || r.contains("FINLAND") || r.hasPrefix("FI-") { return "FI" }
+        if r.contains("🇵🇱") || r.contains("POLAND") || r.hasPrefix("PL-") { return "PL" }
+        if r.contains("🇹🇷") || r.contains("TURKEY") || r.hasPrefix("TR-") { return "TR" }
+        if r.contains("🇸🇬") || r.contains("SINGAPORE") || r.hasPrefix("SG-") { return "SG" }
+        if r.contains("🇰🇿") || r.contains("KAZAKHSTAN") || r.hasPrefix("KZ-") { return "KZ" }
+        return nil
+    }
 
     private var centralHeroPowerControl: some View {
         VStack(spacing: 14) {
@@ -146,6 +156,17 @@ public struct ServersView: View {
                 }
             } label: {
                 ZStack {
+                    // World map background
+                    DotMatrixWorldMap(
+                        connectedCountryISO: vpnManager.selectedNode.flatMap { isoFromNode($0) },
+                        accentColor: theme.accentColor,
+                        isConnected: vpnManager.isConnected
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 240)
+                    .clipped()
+                    .allowsHitTesting(false)
+
                     // Outer animated status ring
                     Circle()
                         .strokeBorder(
@@ -165,6 +186,11 @@ public struct ServersView: View {
                             .rotationEffect(.degrees(vpnManager.isTransitioning ? Double(launchPulseCount * 90) : 0))
                             .animation(.linear(duration: 4).repeatForever(autoreverses: false), value: vpnManager.isConnected)
                     }
+
+                    // Starfall ring during transitioning
+                    StarfallRing(isActive: vpnManager.isTransitioning, accentColor: theme.accentColor)
+                        .frame(width: 164, height: 164)
+                        .allowsHitTesting(false)
 
                     // Central Button Core
                     Circle()
@@ -193,7 +219,7 @@ public struct ServersView: View {
                                 : (vpnManager.isTransitioning ? NothingPalette.pureWhite : NothingPalette.mutedGrey)
                         )
                 }
-                .frame(height: 164)
+                .frame(height: 240)
             }
             .buttonStyle(.plain)
 
@@ -1377,3 +1403,5 @@ extension Character {
         }
     }
 }
+
+

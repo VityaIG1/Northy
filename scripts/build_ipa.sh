@@ -20,7 +20,7 @@ ARCHIVE_PATH="${BUILD_DIR}/Northy.xcarchive"
 PAYLOAD_DIR="${BUILD_DIR}/Payload"
 APP_DIR="${PAYLOAD_DIR}/Northy.app"
 TUNNEL_DIR="${APP_DIR}/PlugIns/NorthyTunnel.appex"
-OUTPUT_NAME="Northy-v0.2.0-signed.ipa"
+OUTPUT_NAME="Northy-v0.3.0-signed.ipa"
 OUTPUT_IPA="${BUILD_DIR}/${OUTPUT_NAME}"
 
 rm -rf "${BUILD_DIR}"
