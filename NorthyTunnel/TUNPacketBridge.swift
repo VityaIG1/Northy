@@ -596,15 +596,12 @@ public final class TUNPacketBridge: @unchecked Sendable {
         let params = NWParameters.udp
         let connection = NWConnection(to: endpoint, using: params)
         let queue = DispatchQueue(label: "northy.dns.\(clientPort)")
-
-        let answeredLock = NSLock()
-        var hasAnswered = false
+        let dnsContext = DNSResolutionContext()
 
         // Timeout fallback after 1.2s if core DNS is not ready
         queue.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self else { return }
-            let alreadyDone = answeredLock.withLock { hasAnswered }
-            if !alreadyDone {
+            if dnsContext.tryClaim() {
                 connection.cancel()
                 self.forwardDNSQueryFallback(
                     queryPayload: queryPayload,
@@ -628,12 +625,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
                         defer { connection.cancel() }
                         guard let data, !data.isEmpty else { return }
 
-                        let shouldProceed = answeredLock.withLock { () -> Bool in
-                            if hasAnswered { return false }
-                            hasAnswered = true
-                            return true
-                        }
-                        guard shouldProceed else { return }
+                        guard dnsContext.tryClaim() else { return }
 
                         if let respPacket = self.buildIPv4UDPPacket(
                             srcIP: dnsServerIPBytes,
@@ -650,12 +642,7 @@ public final class TUNPacketBridge: @unchecked Sendable {
                     }
                 }))
             case .failed, .cancelled:
-                let shouldFallback = answeredLock.withLock { () -> Bool in
-                    if hasAnswered { return false }
-                    hasAnswered = true
-                    return true
-                }
-                if shouldFallback {
+                if dnsContext.tryClaim() {
                     self.forwardDNSQueryFallback(
                         queryPayload: queryPayload,
                         clientIPBytes: clientIPBytes,
@@ -943,6 +930,25 @@ public final class TUNPacketBridge: @unchecked Sendable {
         combined.append(udpHeaderAndPayload)
         let cs = computeChecksum(combined)
         return cs == 0 ? 0xFFFF : cs
+    }
+}
+
+// MARK: - DNS Resolution Context
+
+private final class DNSResolutionContext: @unchecked Sendable {
+    private let lock = NSLock()
+    private var answered = false
+
+    func tryClaim() -> Bool {
+        lock.withLock {
+            if answered { return false }
+            answered = true
+            return true
+        }
+    }
+
+    var isAnswered: Bool {
+        lock.withLock { answered }
     }
 }
 
