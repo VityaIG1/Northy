@@ -10,8 +10,9 @@ set -eo pipefail
 # Env overrides:
 #   LIBXRAY_TAG          libXray git tag to build (default: v26.10.31)
 #   FORCE_LIBXRAY_BUILD  set to 1 to rebuild even if a cached framework exists
+#   BUILD_SIMULATOR      set to 1 to also include ios-arm64-simulator slice
 #
-# Requirements (macOS): Go (`brew install go`) + Xcode with ios SDK.
+# Requirements (macOS): Go (`brew install go`) + Xcode with iOS SDK.
 # Usage: ./scripts/build_libxray.sh
 # ==============================================================================
 
@@ -66,48 +67,111 @@ else
     git clone --depth 1 --branch "${LIBXRAY_TAG}" "${LIBXRAY_REPO}" "${LIBXRAY_CHECKOUT}"
   fi
 
-  # --- [1c] Install gomobile + gobind ------------------------------------------
+  # --- [1c] Build static CGo bridge archive via Go CGo ------------------------
+  # Note: cgo_bridge defines package main with //export CGoInvoke & CGoFree.
+  # We compile it with -buildmode=c-archive into a static archive (.a) + header (.h),
+  # then package it with xcodebuild -create-xcframework.
 
-  echo ">> [Core] Installing gomobile toolchain..."
-  go install golang.org/x/mobile/cmd/gomobile@latest
-  go install golang.org/x/mobile/cmd/gobind@latest
-  gomobile init
+  BUILD_TEMP="${ROOT_DIR}/build/libxray_build"
+  rm -rf "${BUILD_TEMP}" "${XCFRAMEWORK_PATH}"
+  mkdir -p "${BUILD_TEMP}/ios-arm64" "${BUILD_TEMP}/include"
 
-  # --- [1d] Bind the CGo bridge into a static xcframework -----------------------
-  # Note: no -ldflags "-s -w" — stripping may remove exported CGo symbols from
-  # the static archive, which the tunnel resolves via dlsym at runtime.
+  IPHONEOS_SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+  MIN_IOS_VERSION="15.0"
+  IOS_FLAGS="-isysroot ${IPHONEOS_SDK} -miphoneos-version-min=${MIN_IOS_VERSION} -arch arm64"
 
-  echo ">> [Core] Binding LibXray.xcframework (ios arm64) — this takes ~10-15 min..."
-  cd "${LIBXRAY_CHECKOUT}"
-  gomobile bind \
-    -o "${XCFRAMEWORK_PATH}" \
-    -target=ios \
-    -iosversion=15.0 \
-    ./cgo_bridge
+  echo ">> [Core] Compiling libXray.a for iOS (arm64) via CGo — this takes ~3-5 min..."
+  (
+    cd "${LIBXRAY_CHECKOUT}"
+    CGO_ENABLED=1 \
+    GOOS=ios \
+    GOARCH=arm64 \
+    GOFLAGS="-tags=ios" \
+    CC="$(xcrun --sdk iphoneos --find clang)" \
+    CXX="$(xcrun --sdk iphoneos --find clang++)" \
+    CGO_CFLAGS="${IOS_FLAGS}" \
+    CGO_CXXFLAGS="${IOS_FLAGS}" \
+    CGO_LDFLAGS="${IOS_FLAGS} -Wl,-Bsymbolic-functions" \
+    go build \
+      -trimpath \
+      -ldflags="-buildid=" \
+      -buildmode=c-archive \
+      -o "${BUILD_TEMP}/ios-arm64/libXray.a" \
+      ./cgo_bridge
+  )
 
+  # Copy generated header and write umbrella module map
+  cp "${BUILD_TEMP}/ios-arm64/libXray.h" "${BUILD_TEMP}/include/libXray.h"
+  cat <<'EOF' > "${BUILD_TEMP}/include/module.modulemap"
+module LibXray {
+  umbrella header "libXray.h"
+  export *
+  module * { export * }
+}
+EOF
+
+  XCFRAMEWORK_ARGS=("-library" "${BUILD_TEMP}/ios-arm64/libXray.a" "-headers" "${BUILD_TEMP}/include")
+
+  # Optional simulator slice for local debugging
+  if [ "${BUILD_SIMULATOR:-0}" = "1" ]; then
+    SIM_SDK="$(xcrun --sdk iphonesimulator --show-sdk-path 2>/dev/null || true)"
+    if [ -n "${SIM_SDK}" ]; then
+      echo ">> [Core] Compiling libXray.a for iOS Simulator (arm64)..."
+      mkdir -p "${BUILD_TEMP}/ios-arm64-simulator"
+      SIM_FLAGS="-isysroot ${SIM_SDK} -mios-simulator-version-min=${MIN_IOS_VERSION} -arch arm64"
+      (
+        cd "${LIBXRAY_CHECKOUT}"
+        CGO_ENABLED=1 \
+        GOOS=ios \
+        GOARCH=arm64 \
+        GOFLAGS="-tags=ios" \
+        CC="$(xcrun --sdk iphonesimulator --find clang)" \
+        CXX="$(xcrun --sdk iphonesimulator --find clang++)" \
+        CGO_CFLAGS="${SIM_FLAGS}" \
+        CGO_CXXFLAGS="${SIM_FLAGS}" \
+        CGO_LDFLAGS="${SIM_FLAGS} -Wl,-Bsymbolic-functions" \
+        go build \
+          -trimpath \
+          -ldflags="-buildid=" \
+          -buildmode=c-archive \
+          -o "${BUILD_TEMP}/ios-arm64-simulator/libXray.a" \
+          ./cgo_bridge
+      )
+      XCFRAMEWORK_ARGS+=("-library" "${BUILD_TEMP}/ios-arm64-simulator/libXray.a" "-headers" "${BUILD_TEMP}/include")
+    fi
+  fi
+
+  echo ">> [Core] Packaging LibXray.xcframework..."
+  xcodebuild -create-xcframework "${XCFRAMEWORK_ARGS[@]}" -output "${XCFRAMEWORK_PATH}"
+
+  rm -rf "${BUILD_TEMP}"
   echo "${LIBXRAY_TAG}" > "${TAG_MARKER}"
 
-  # --- [1e] Symbol gate: CGoInvoke/CGoFree MUST be exported --------------------
+  # --- [1d] Symbol gate: CGoInvoke/CGoFree MUST be exported --------------------
 
   FW_SLICE_DIR="${XCFRAMEWORK_PATH}/ios-arm64"
   FW_BIN=""
-  for fw_dir in "${FW_SLICE_DIR}"/*.framework; do
-    candidate="${fw_dir}/$(basename "${fw_dir}")"
-    if [ -f "${candidate}" ]; then FW_BIN="${candidate}"; break; fi
-  done
+  if [ -f "${FW_SLICE_DIR}/libXray.a" ]; then
+    FW_BIN="${FW_SLICE_DIR}/libXray.a"
+  else
+    for candidate in "${FW_SLICE_DIR}"/*.a "${FW_SLICE_DIR}"/*.framework/*; do
+      if [ -f "${candidate}" ]; then FW_BIN="${candidate}"; break; fi
+    done
+  fi
 
-  if [ -z "${FW_BIN}" ]; then
+  if [ -z "${FW_BIN}" ] || [ ! -f "${FW_BIN}" ]; then
     echo "ERROR: Could not locate the framework binary under ${FW_SLICE_DIR}."
     exit 1
   fi
 
   if ! nm -gU "${FW_BIN}" 2>/dev/null | grep -q "_CGoInvoke"; then
     echo "ERROR: CGoInvoke symbol is missing from the built framework (${FW_BIN})."
-    echo "       The Go CGo bridge was dead-stripped or the bind failed silently."
+    echo "       The Go CGo bridge failed to export CGoInvoke."
     exit 1
   fi
   if ! nm -gU "${FW_BIN}" 2>/dev/null | grep -q "_CGoFree"; then
     echo "ERROR: CGoFree symbol is missing from the built framework (${FW_BIN})."
+    echo "       The Go CGo bridge failed to export CGoFree."
     exit 1
   fi
   echo ">> [✓] Core symbols verified: CGoInvoke + CGoFree exported"

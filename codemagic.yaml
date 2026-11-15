@@ -3,6 +3,10 @@ workflows:
     name: Build Northy IPA
     instance_type: mac_mini_m1
     max_build_duration: 60
+    environment:
+      vars:
+        HOMEBREW_NO_AUTO_UPDATE: "1"
+        HOMEBREW_NO_INSTALL_CLEANUP: "1"
     cache:
       cache_paths:
         - ~/go/pkg/mod
