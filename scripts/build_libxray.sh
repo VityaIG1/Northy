@@ -91,7 +91,7 @@ else
     CXX="$(xcrun --sdk iphoneos --find clang++)" \
     CGO_CFLAGS="${IOS_FLAGS}" \
     CGO_CXXFLAGS="${IOS_FLAGS}" \
-    CGO_LDFLAGS="${IOS_FLAGS} -Wl,-Bsymbolic-functions" \
+    CGO_LDFLAGS="${IOS_FLAGS}" \
     go build \
       -trimpath \
       -ldflags="-buildid=" \
@@ -129,7 +129,7 @@ EOF
         CXX="$(xcrun --sdk iphonesimulator --find clang++)" \
         CGO_CFLAGS="${SIM_FLAGS}" \
         CGO_CXXFLAGS="${SIM_FLAGS}" \
-        CGO_LDFLAGS="${SIM_FLAGS} -Wl,-Bsymbolic-functions" \
+        CGO_LDFLAGS="${SIM_FLAGS}" \
         go build \
           -trimpath \
           -ldflags="-buildid=" \

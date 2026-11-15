@@ -23,9 +23,12 @@ public final class ProxyCoreController: @unchecked Sendable {
     /// libXray invoke API version (github.com/XTLS/libXray `invoke_model.go`)
     private static let libXrayAPIVersion = 3
 
-    /// libXray CGo bridge signatures (`cgo_bridge/main.go`)
-    private typealias CGoInvokeFunc = @convention(c) (UnsafeMutablePointer<CChar>) -> UnsafeMutablePointer<CChar>?
-    private typealias CGoFreeFunc = @convention(c) (UnsafeMutablePointer<CChar>) -> Void
+    /// Direct CGo bridge symbol imports (statically linked from LibXray.xcframework)
+    @_silgen_name("CGoInvoke")
+    private static func directCGoInvoke(_ requestJSON: UnsafeMutablePointer<CChar>?) -> UnsafeMutablePointer<CChar>?
+
+    @_silgen_name("CGoFree")
+    private static func directCGoFree(_ value: UnsafeMutablePointer<CChar>?) -> Void
 
     /// Legacy pre-2025 libXray export signatures (kept as a compatibility fallback)
     private typealias LegacyRunFunc = @convention(c) (UnsafePointer<CChar>) -> UnsafePointer<CChar>?
@@ -174,23 +177,15 @@ public final class ProxyCoreController: @unchecked Sendable {
     /// Both the request copy and every non-null response are released with `CGoFree`,
     /// as required by the libXray CGo contract.
     private static func cgoInvokeRaw(requestJSON: String) -> String? {
-        #if canImport(Darwin)
-        guard let handle = dlopen(nil, RTLD_NOW) else { return nil }
-        defer { dlclose(handle) }
-
-        guard let invokeSym = dlsym(handle, "CGoInvoke"),
-              let freeSym = dlsym(handle, "CGoFree") else { return nil }
-
-        let cgoInvoke = unsafeBitCast(invokeSym, to: CGoInvokeFunc.self)
-        let cgoFree = unsafeBitCast(freeSym, to: CGoFreeFunc.self)
-
         guard let requestPtr = strdup(requestJSON) else { return nil }
-        let responsePtr = cgoInvoke(requestPtr)
-        cgoFree(requestPtr)
+
+        #if canImport(Darwin)
+        let responsePtr = directCGoInvoke(requestPtr)
+        directCGoFree(requestPtr)
 
         guard let responsePtr else { return nil }
         let response = String(cString: responsePtr)
-        cgoFree(responsePtr)
+        directCGoFree(responsePtr)
         return response
         #else
         return nil

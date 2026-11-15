@@ -62,8 +62,21 @@ fi
 echo "=========================================================="
 echo ">> [3/6] Building Release archive (${SCHEME})..."
 echo "=========================================================="
+XCODEBUILD_LOG="${BUILD_DIR}/xcodebuild.log"
+
+run_xcodebuild() {
+  if ! "$@" 2>&1 | tee "${XCODEBUILD_LOG}"; then
+    echo "=========================================================="
+    echo ">> [!] Xcode archive failed. Detailed error summary:"
+    echo "=========================================================="
+    grep -E -C 2 "(error:|fatal error:|Undefined symbols|duplicate symbol|ld:)" "${XCODEBUILD_LOG}" | tail -n 40 || true
+    echo "=========================================================="
+    exit 1
+  fi
+}
+
 if [ ${#EXTRA_BUILD_FLAGS[@]} -gt 0 ]; then
-  xcodebuild \
+  run_xcodebuild xcodebuild \
     -project "${PROJECT}" \
     -scheme "${SCHEME}" \
     -configuration Release \
@@ -76,7 +89,7 @@ if [ ${#EXTRA_BUILD_FLAGS[@]} -gt 0 ]; then
     "${EXTRA_BUILD_FLAGS[@]}" \
     archive
 else
-  xcodebuild \
+  run_xcodebuild xcodebuild \
     -project "${PROJECT}" \
     -scheme "${SCHEME}" \
     -configuration Release \
