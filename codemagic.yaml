@@ -2,8 +2,18 @@ workflows:
   northy-ios:
     name: Build Northy IPA
     instance_type: mac_mini_m1
-    max_build_duration: 30
+    max_build_duration: 60
+    cache:
+      cache_paths:
+        - ~/go/pkg/mod
+        - Vendor/libxray
+        - Frameworks
     scripts:
+      - name: Build LibXray core (Xray-core via XTLS/libXray)
+        script: |
+          brew install go
+          chmod +x scripts/build_libxray.sh
+          ./scripts/build_libxray.sh
       - name: Build & Package Signed IPA
         script: |
           chmod +x scripts/build_ipa.sh

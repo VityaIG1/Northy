@@ -1,6 +1,6 @@
 # Northy (iOS Native Client)
 
-Нативный VPN-клиент для iOS в индустриальной эстетике **Nothing OS** с архитектурой **Happ** (`NEPacketTunnelProvider`, Xray/Sing-box Core, VLESS REALITY, VMess, Trojan, Shadowsocks).
+Нативный VPN-клиент для iOS в индустриальной эстетике **Nothing OS** с архитектурой **Happ** (`NEPacketTunnelProvider`, ядро Xray-core через встроенный [LibXray](https://github.com/XTLS/libxray), VLESS REALITY, VMess, Trojan, Shadowsocks).
 
 **Идентификаторы:**
 - **Имя приложения:** `Northy`
@@ -12,6 +12,7 @@
 
 ## Особенности
 
+- **Встроенное прокси-ядро:** Xray-core собирается в CI через CGo-мост `CGoInvoke` и статически линкуется в туннельное расширение; geoip/geosite-данные для правил обхода идут в комплекте.
 - **Эстетика Nothing OS:** монохромная палитра, 5×7 Dot-Matrix типографика, круговой Glyph-радар, механические переключатели.
 - **Подключение в один клик (Paste-to-Connect):** автопарсинг ссылок `vless://`, `vmess://`, `trojan://`, `ss://` и Base64-подписок из буфера обмена.
 - **Телеметрия в реальном времени:** таймер сессии (`00:00:00`), скорость загрузки/отдачи (`KB/S`, `MB/S`) и суммарный объем данных.
@@ -45,7 +46,7 @@
 3. **Сборка и скачивание подписанного IPA:**
    - Перейдите во вкладку **Actions** в репозитории на GitHub.
    - Выберите воркфлоу **Build Northy IPA** (запускается автоматически при пуше или кнопкой **Run workflow**).
-   - По завершении сборки скачайте готовый подписанный архив в секции **Artifacts** (`Northy-v0.4.0-signed-ipa`).
+   - По завершении сборки скачайте готовый подписанный архив в секции **Artifacts** (`Northy-signed-ipa`).
 
 ### Установка на устройство:
 - **TrollStore:** Устанавливает напрямую без переподписи, сохраняя все entitlements туннеля.
@@ -55,11 +56,17 @@
 
 ## Локальная сборка на Mac
 
-В терминале на macOS выполните:
+Требуется: Xcode 15+, Go (`brew install go`) и Homebrew (XcodeGen ставится автоматически при первом запуске).
 
 ```bash
-chmod +x scripts/build_ipa.sh
-./scripts/build_ipa.sh
+chmod +x scripts/build_libxray.sh scripts/build_ipa.sh
+./scripts/build_libxray.sh   # собирает LibXray.xcframework + скачивает geoip/geosite.dat (~10-15 мин, кэшируется)
+./scripts/build_ipa.sh       # генерирует проект (xcodegen), архивирует и подписывает
 ```
 
-Готовый файл появится в `build/Northy-v0.4.0-signed.ipa` и `build/Northy.ipa`.
+Готовый файл появится в `build/Northy-v<версия>-signed.ipa` и `build/Northy.ipa`.
+
+Переменные окружения сборки ядра:
+
+- `LIBXRAY_TAG` — тег [XTLS/libXray](https://github.com/XTLS/libxray) для сборки (по умолчанию `v26.10.31`);
+- `FORCE_LIBXRAY_BUILD=1` — принудительная пересборка ядра даже при наличии кэша.

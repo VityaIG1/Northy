@@ -50,6 +50,11 @@ targets:
           - "Info.plist"
           - "*.entitlements"
       - path: Shared
+      - path: Frameworks/geo
+        buildPhase: resources
+    dependencies:
+      - framework: Frameworks/LibXray.xcframework
+        embed: false
     info:
       path: NorthyTunnel/Info.plist
     entitlements:
@@ -58,6 +63,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.scrt.north.PacketTunnel
         SKIP_INSTALL: YES
+        OTHER_LDFLAGS: "$(inherited) -ObjC"
         LD_RUNPATH_SEARCH_PATHS:
           - "$(inherited)"
           - "@executable_path/Frameworks"

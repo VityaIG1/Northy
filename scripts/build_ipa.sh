@@ -15,19 +15,37 @@ TUNNEL_BUNDLE_ID="com.scrt.north.PacketTunnel"
 TEAM_ID="NORTHVPN99"
 APP_GROUP="group.com.scrt.north"
 
+# Single source of truth for the marketing version is project.yml (XcodeGen spec)
+APP_VERSION="$(grep -E 'MARKETING_VERSION:' project.yml | head -n 1 | sed -E 's/.*"([0-9]+(\.[0-9]+)+)".*/\1/')"
+APP_VERSION="${APP_VERSION:-0.4.0}"
+
 BUILD_DIR="./build"
 ARCHIVE_PATH="${BUILD_DIR}/Northy.xcarchive"
 PAYLOAD_DIR="${BUILD_DIR}/Payload"
 APP_DIR="${PAYLOAD_DIR}/Northy.app"
 TUNNEL_DIR="${APP_DIR}/PlugIns/NorthyTunnel.appex"
-OUTPUT_NAME="Northy-v0.4.0-signed.ipa"
+OUTPUT_NAME="Northy-v${APP_VERSION}-signed.ipa"
 OUTPUT_IPA="${BUILD_DIR}/${OUTPUT_NAME}"
 
 rm -rf "${BUILD_DIR}"
 mkdir -p "${PAYLOAD_DIR}"
 
 echo "=========================================================="
-echo ">> [1/5] Detecting iOS SDK and target alignment..."
+echo ">> [1/6] Generating Xcode project from project.yml (XcodeGen)..."
+echo "=========================================================="
+if ! command -v xcodegen >/dev/null 2>&1; then
+  command -v brew >/dev/null 2>&1 || {
+    echo "ERROR: xcodegen not found and Homebrew is unavailable."
+    echo "       Install XcodeGen manually: https://github.com/yonaskolb/XcodeGen"
+    exit 1
+  }
+  echo ">> Installing xcodegen via Homebrew..."
+  brew install xcodegen
+fi
+xcodegen generate
+
+echo "=========================================================="
+echo ">> [2/6] Detecting iOS SDK and target alignment..."
 echo "=========================================================="
 SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo "")
 EXTRA_BUILD_FLAGS=()
@@ -42,7 +60,7 @@ if [ -n "${SDK_VERSION}" ]; then
 fi
 
 echo "=========================================================="
-echo ">> [2/5] Building Release archive (${SCHEME})..."
+echo ">> [3/6] Building Release archive (${SCHEME})..."
 echo "=========================================================="
 if [ ${#EXTRA_BUILD_FLAGS[@]} -gt 0 ]; then
   xcodebuild \
@@ -72,12 +90,26 @@ else
 fi
 
 echo "=========================================================="
-echo ">> [3/5] Extracting compiled app bundle into Payload..."
+echo ">> [4/6] Extracting compiled app bundle into Payload..."
 echo "=========================================================="
 cp -R "${ARCHIVE_PATH}/Products/Applications/Northy.app" "${APP_DIR}"
 
+echo ">> Verifying LibXray core linkage in the tunnel extension..."
+TUNNEL_BIN="${TUNNEL_DIR}/NorthyTunnel"
+if [ -f "${TUNNEL_BIN}" ]; then
+  if ! nm -gU "${TUNNEL_BIN}" 2>/dev/null | grep -q "_CGoInvoke"; then
+    echo "ERROR: CGoInvoke symbol missing from NorthyTunnel binary."
+    echo "       LibXray was not linked (or was dead-stripped). Run ./scripts/build_libxray.sh"
+    echo "       first and make sure OTHER_LDFLAGS contains -ObjC in project.yml."
+    exit 1
+  fi
+  echo ">> [✓] LibXray CGo bridge detected in NorthyTunnel binary"
+else
+  echo ">> [!] Tunnel binary not found at ${TUNNEL_BIN} — skipping core symbol check"
+fi
+
 echo "=========================================================="
-echo ">> [4/5] Preparing code signing identity & mobileprovisions..."
+echo ">> [5/6] Preparing code signing identity & mobileprovisions..."
 echo "=========================================================="
 TEMP_DIR="/tmp/northy_signing_$$"
 mkdir -p "${TEMP_DIR}"
@@ -187,7 +219,7 @@ else
 fi
 
 echo "=========================================================="
-echo ">> [5/5] Packaging .ipa..."
+echo ">> [6/6] Packaging .ipa..."
 echo "=========================================================="
 (cd "${BUILD_DIR}" && zip -qry "${OUTPUT_NAME}" Payload)
 cp "${OUTPUT_IPA}" "${BUILD_DIR}/Northy.ipa"

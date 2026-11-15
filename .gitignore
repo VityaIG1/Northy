@@ -7,6 +7,8 @@
 # Xcode & Apple build artifacts
 build/
 DerivedData/
+Frameworks/
+Vendor/
 *.xcuserstate
 project.xcworkspace/xcuserdata/
 *.xcuserdata/

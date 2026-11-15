@@ -25,6 +25,17 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Setup Go toolchain (for LibXray / gomobile)
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Build LibXray Core (Xray-core via XTLS/libXray)
+        run: |
+          chmod +x scripts/build_libxray.sh
+          ./scripts/build_libxray.sh
+
       - name: Setup Apple Signing Certificate (if secrets provided)
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -71,6 +82,6 @@ jobs:
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Northy-v0.4.0-signed-ipa
+          name: Northy-signed-ipa
           path: build/*.ipa
           if-no-files-found: error
